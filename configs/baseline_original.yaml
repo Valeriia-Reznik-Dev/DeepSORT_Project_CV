@@ -10,7 +10,7 @@ paths:
   # MOT15 video + GT (downloaded locally)
   mot15_dir: resources/detections/MOT15/train
   # MOT16 train videos — download from motchallenge.net if missing
-  mot16_dir: data/MOT16/train
+  mot16_dir: resources/detections/MOT16/train
   # Precomputed / generated detection+feature .npy files
   detections_mot15: resources/detections/MOT15_train
   detections_mot16: resources/detections/MOT16_POI_train
