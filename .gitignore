@@ -99,3 +99,11 @@ motchallenge-mot17-data-view.ipynb
 ../p5/
 ../PLAN.md
 ../README.md
+
+# Baseline data & experiment outputs (keep locally)
+resources/
+data/
+results/
+overlays/
+external/
+.venv/

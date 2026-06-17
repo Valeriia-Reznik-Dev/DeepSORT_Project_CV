@@ -1,0 +1,29 @@
+# Original DeepSORT baseline (nwojke/deep_sort) — paper defaults.
+tracker:
+  min_confidence: 0.3
+  nn_budget: 100
+  max_cosine_distance: 0.2
+  min_detection_height: 0
+  nms_max_overlap: 1.0
+
+paths:
+  # MOT15 video + GT (downloaded locally)
+  mot15_dir: resources/detections/MOT15/train
+  # MOT16 train videos — download from motchallenge.net if missing
+  mot16_dir: data/MOT16/train
+  # Precomputed / generated detection+feature .npy files
+  detections_mot15: resources/detections/MOT15_train
+  detections_mot16: resources/detections/MOT16_POI_train
+  reid_model: resources/networks/mars-small128.pb
+  results_dir: results/baseline/original
+  overlays_dir: overlays/original
+
+sequences:
+  mot15:
+    - TUD-Campus
+    - TUD-Stadtmitte
+    - KITTI-17
+    - PETS09-S2L1
+  mot16:
+    - MOT16-09
+    - MOT16-11
