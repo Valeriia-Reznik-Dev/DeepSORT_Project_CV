@@ -87,3 +87,15 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+# Local course materials — do not push
+PLAN.md
+tf_sklearn.patch
+motchallenge-mot17-data-view.ipynb
+../p1/
+../p2/
+../p3/
+../p4/
+../p5/
+../PLAN.md
+../README.md
