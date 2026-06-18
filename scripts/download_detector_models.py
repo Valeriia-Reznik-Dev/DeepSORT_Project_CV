@@ -15,10 +15,19 @@ NANODET_CKPT_URL = (
     "https://github.com/RangiLyu/nanodet/releases/download/v1.0.0-alpha-1/"
     "nanodet-plus-m_416_checkpoint.ckpt"
 )
-MMDET_CONFIG_URL = (
-    "https://raw.githubusercontent.com/open-mmlab/mmdetection/v3.3.0/configs/rtmdet/"
-    "rtmdet_tiny_8xb32-300e_coco.py"
+MMDET_CONFIG_TAG = "v3.3.0"
+MMDET_CONFIG_BASE = (
+    f"https://raw.githubusercontent.com/open-mmlab/mmdetection/{MMDET_CONFIG_TAG}/configs"
 )
+MMDET_CONFIG_FILES = [
+    "rtmdet/rtmdet_tiny_8xb32-300e_coco.py",
+    "rtmdet/rtmdet_s_8xb32-300e_coco.py",
+    "rtmdet/rtmdet_l_8xb32-300e_coco.py",
+    "rtmdet/rtmdet_tta.py",
+    "_base_/default_runtime.py",
+    "_base_/schedules/schedule_1x.py",
+    "_base_/datasets/coco_detection.py",
+]
 MMDET_CKPT_URL = (
     "https://download.openmmlab.com/mmdetection/v3.0/rtmdet/rtmdet_tiny_8xb32-300e_coco/"
     "rtmdet_tiny_8xb32-300e_coco_20220902_112414-78e30dcc.pth"
@@ -42,7 +51,8 @@ def download_nanodet(root: Path) -> None:
 
 def download_mmdet(root: Path) -> None:
     out = root / "resources" / "models" / "mmdet"
-    _download(MMDET_CONFIG_URL, out / "rtmdet_tiny_8xb32-300e_coco.py")
+    for rel in MMDET_CONFIG_FILES:
+        _download(f"{MMDET_CONFIG_BASE}/{rel}", out / rel)
     _download(
         MMDET_CKPT_URL,
         out / "rtmdet_tiny_8xb32-300e_coco_20220902_112414-78e30dcc.pth",
