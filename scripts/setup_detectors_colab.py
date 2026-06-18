@@ -15,6 +15,7 @@ NANO_COLLATE = NANO_DIR / "nanodet" / "data" / "collate.py"
 TORCH_SIX_PATCH = "string_classes = (str, bytes)"
 MMCV_VERSION = "2.2.0"
 MMCV_TORCH = "2.4.0"
+MMDET_MMCV_MAX_VERSION = "2.3.0"  # mmdet 3.3.0 excludes mmcv==2.2.0; patch assert
 PIP_TIMEOUT_S = 300
 
 
@@ -26,6 +27,17 @@ def run(cmd: list[str], *, cwd: Path | None = None) -> None:
 def verify_import(module: str) -> None:
     """Import in a fresh subprocess (editable installs are not always visible in-process)."""
     run([sys.executable, "-c", f"import {module}"])
+
+
+def _torch_version() -> str:
+    return subprocess.check_output(
+        [sys.executable, "-c", "import torch; print(torch.__version__)"],
+        text=True,
+    ).strip()
+
+
+def _torch_major_minor(version: str) -> str:
+    return ".".join(version.split("+")[0].split(".")[:2])
 
 
 def patch_nanodet_for_pytorch2() -> None:
@@ -77,6 +89,18 @@ def _has_gpu_runtime() -> bool:
         )
         return "NVIDIA" in out
     except (FileNotFoundError, subprocess.CalledProcessError):
+        pass
+    try:
+        subprocess.check_call(
+            [
+                sys.executable,
+                "-c",
+                "import sys, torch; sys.exit(0 if torch.cuda.is_available() else 1)",
+            ],
+            stderr=subprocess.DEVNULL,
+        )
+        return True
+    except subprocess.CalledProcessError:
         return False
 
 
@@ -91,62 +115,85 @@ def _mmcv_wheel_index(cu_tag: str, torch_tag: str) -> str | None:
     return None
 
 
+def _pin_torch(cu_tag: str) -> None:
+    index = (
+        "https://download.pytorch.org/whl/cu121"
+        if cu_tag != "cpu"
+        else "https://download.pytorch.org/whl/cpu"
+    )
+    run([
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "-q",
+        "--timeout",
+        str(PIP_TIMEOUT_S),
+        "--force-reinstall",
+        f"torch=={MMCV_TORCH}",
+        "torchvision==0.19.0",
+        "--index-url",
+        index,
+    ])
+
+
 def _ensure_torch_for_mmcv() -> tuple[str, str]:
     """Pin PyTorch to a version with prebuilt mmcv wheels (avoids 20+ min source builds)."""
-    import torch
-
-    torch_mm = ".".join(torch.__version__.split("+")[0].split(".")[:2])
     cu_tag = "cu121" if _has_gpu_runtime() else "cpu"
-    if torch_mm == MMCV_TORCH and _mmcv_wheel_index(cu_tag, MMCV_TORCH):
-        print(f"PyTorch {torch.__version__} OK for mmcv ({cu_tag}/torch{MMCV_TORCH})")
-        return cu_tag, MMCV_TORCH
+    torch_ver = _torch_version()
+    torch_mm = _torch_major_minor(torch_ver)
 
-    if cu_tag == "cpu":
-        run([
-            sys.executable,
-            "-m",
-            "pip",
-            "install",
-            "-q",
-            "--timeout",
-            str(PIP_TIMEOUT_S),
-            f"torch=={MMCV_TORCH}",
-            "torchvision==0.19.0",
-            "--index-url",
-            "https://download.pytorch.org/whl/cpu",
-        ])
-    else:
-        run([
-            sys.executable,
-            "-m",
-            "pip",
-            "install",
-            "-q",
-            "--timeout",
-            str(PIP_TIMEOUT_S),
-            f"torch=={MMCV_TORCH}",
-            "torchvision==0.19.0",
-            "--index-url",
-            "https://download.pytorch.org/whl/cu121",
-        ])
+    if torch_mm != MMCV_TORCH or not _mmcv_wheel_index(cu_tag, MMCV_TORCH):
+        print(f"Colab PyTorch {torch_ver} has no mmcv wheel; pinning torch=={MMCV_TORCH} ...")
+        _pin_torch(cu_tag)
+        torch_ver = _torch_version()
+        torch_mm = _torch_major_minor(torch_ver)
 
-    import importlib
+    if torch_mm != MMCV_TORCH:
+        raise RuntimeError(
+            f"Failed to pin PyTorch to {MMCV_TORCH}, still have {torch_ver}. "
+            "Restart runtime and rerun setup."
+        )
+    if not _mmcv_wheel_index(cu_tag, MMCV_TORCH):
+        raise RuntimeError(
+            f"No prebuilt mmcv=={MMCV_VERSION} wheel for {cu_tag}/torch{MMCV_TORCH}."
+        )
 
-    importlib.invalidate_caches()
-    import torch as torch_mod
-
-    print(f"Pinned PyTorch {torch_mod.__version__} for mmcv ({cu_tag}/torch{MMCV_TORCH})")
+    print(f"PyTorch {torch_ver} ready for mmcv ({cu_tag}/torch{MMCV_TORCH})")
     return cu_tag, MMCV_TORCH
+
+
+def _patch_mmdet_mmcv_check() -> None:
+    """mmdet 3.3.0 rejects mmcv==2.2.0; loosen the hard-coded upper bound."""
+    run([
+        sys.executable,
+        "-c",
+        (
+            "import pathlib, site\n"
+            "old = \"mmcv_maximum_version = '2.2.0'\"\n"
+            f"new = \"mmcv_maximum_version = '{MMDET_MMCV_MAX_VERSION}'\"\n"
+            "for root in site.getsitepackages():\n"
+            "    path = pathlib.Path(root) / 'mmdet' / '__init__.py'\n"
+            "    if not path.is_file():\n"
+            "        continue\n"
+            "    text = path.read_text()\n"
+            "    if old in text:\n"
+            "        path.write_text(text.replace(old, new))\n"
+            "        print(f'Patched {path} for mmcv=={MMCV_VERSION}')\n"
+            "        break\n"
+            "    if new in text:\n"
+            "        print(f'Already patched: {path}')\n"
+            "        break\n"
+            "else:\n"
+            "    raise RuntimeError('mmdet __init__.py not found for mmcv version patch')\n"
+        ),
+    ])
 
 
 def install_mmdet() -> None:
     cu_tag, torch_tag = _ensure_torch_for_mmcv()
     mmcv_index = _mmcv_wheel_index(cu_tag, torch_tag)
-    if not mmcv_index:
-        raise RuntimeError(
-            f"No prebuilt mmcv=={MMCV_VERSION} wheel for {cu_tag}/torch{torch_tag}. "
-            "Use a GPU Colab runtime or report this combo."
-        )
+    assert mmcv_index is not None
 
     run([
         sys.executable,
@@ -160,7 +207,7 @@ def install_mmdet() -> None:
         "openmim",
         "mmengine",
     ])
-    print(f"Installing mmcv from prebuilt wheel ({cu_tag}/torch{torch_tag}) ...")
+    print(f"Installing mmcv=={MMCV_VERSION} from prebuilt wheel ({cu_tag}/torch{torch_tag}) ...")
     run([
         sys.executable,
         "-m",
@@ -183,11 +230,12 @@ def install_mmdet() -> None:
         "-q",
         "--timeout",
         str(PIP_TIMEOUT_S),
-        "mmdet",
+        "mmdet==3.3.0",
     ])
+    _patch_mmdet_mmcv_check()
     verify_import("mmdet")
 
-    print(f"mmdet OK (mmcv wheel: {cu_tag}/torch{torch_tag})")
+    print(f"mmdet OK (mmcv=={MMCV_VERSION}, {cu_tag}/torch{torch_tag})")
 
 
 def main() -> None:
