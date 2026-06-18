@@ -66,9 +66,8 @@ class NanoDetDetector(Detector):
             results = self.model.inference(meta)
 
         dets = results[0]
-        person_label = self.class_names[COCO_PERSON_CLASS]
         detections: list[DetectionResult] = []
-        for box in dets.get(person_label, []):
+        for box in dets.get(COCO_PERSON_CLASS, []):
             if box[-1] < self.conf_threshold:
                 continue
             x1, y1, x2, y2, score = box
