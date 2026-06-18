@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import subprocess
-import sys
 import urllib.request
 from pathlib import Path
 
@@ -16,6 +14,14 @@ NANODET_CONFIG_URL = (
 NANODET_CKPT_URL = (
     "https://github.com/RangiLyu/nanodet/releases/download/v1.0.0-alpha-1/"
     "nanodet-plus-m_416_checkpoint.ckpt"
+)
+MMDET_CONFIG_URL = (
+    "https://raw.githubusercontent.com/open-mmlab/mmdetection/v3.3.0/configs/rtmdet/"
+    "rtmdet_tiny_8xb32-300e_coco.py"
+)
+MMDET_CKPT_URL = (
+    "https://download.openmmlab.com/mmdetection/v3.0/rtmdet/rtmdet_tiny_8xb32-300e_coco/"
+    "rtmdet_tiny_8xb32-300e_coco_20220902_112414-78e30dcc.pth"
 )
 
 
@@ -36,29 +42,10 @@ def download_nanodet(root: Path) -> None:
 
 def download_mmdet(root: Path) -> None:
     out = root / "resources" / "models" / "mmdet"
-    out.mkdir(parents=True, exist_ok=True)
-    cfg = out / "rtmdet_tiny_8xb32-300e_coco.py"
-    ckpt = out / "rtmdet_tiny_8xb32-300e_coco_20220902_112414-78e30dcc.pth"
-    if cfg.is_file() and ckpt.is_file():
-        print(f"OK (exists): {cfg.name}, {ckpt.name}")
-        return
-
-    subprocess.run(
-        [sys.executable, "-m", "pip", "install", "-q", "setuptools==75.8.2", "openmim"],
-        check=True,
-    )
-    subprocess.run(
-        [
-            "mim",
-            "download",
-            "mmdet",
-            "--config",
-            "rtmdet_tiny_8xb32-300e_coco",
-            "--dest",
-            str(out),
-        ],
-        check=True,
-        cwd=root,
+    _download(MMDET_CONFIG_URL, out / "rtmdet_tiny_8xb32-300e_coco.py")
+    _download(
+        MMDET_CKPT_URL,
+        out / "rtmdet_tiny_8xb32-300e_coco_20220902_112414-78e30dcc.pth",
     )
 
 
@@ -72,7 +59,7 @@ def main() -> None:
     parser.add_argument(
         "--skip-mmdet",
         action="store_true",
-        help="Skip MMDet download (mim); NanoDet only",
+        help="Skip MMDet weight download; NanoDet only",
     )
     args = parser.parse_args()
     root = Path(args.root)
