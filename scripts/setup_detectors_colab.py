@@ -163,29 +163,23 @@ def _ensure_torch_for_mmcv() -> tuple[str, str]:
 
 def _patch_mmdet_mmcv_check() -> None:
     """mmdet 3.3.0 rejects mmcv==2.2.0; loosen the hard-coded upper bound."""
-    run([
-        sys.executable,
-        "-c",
-        (
-            "import pathlib, site\n"
-            "old = \"mmcv_maximum_version = '2.2.0'\"\n"
-            f"new = \"mmcv_maximum_version = '{MMDET_MMCV_MAX_VERSION}'\"\n"
-            "for root in site.getsitepackages():\n"
-            "    path = pathlib.Path(root) / 'mmdet' / '__init__.py'\n"
-            "    if not path.is_file():\n"
-            "        continue\n"
-            "    text = path.read_text()\n"
-            "    if old in text:\n"
-            "        path.write_text(text.replace(old, new))\n"
-            "        print(f'Patched {path} for mmcv=={MMCV_VERSION}')\n"
-            "        break\n"
-            "    if new in text:\n"
-            "        print(f'Already patched: {path}')\n"
-            "        break\n"
-            "else:\n"
-            "    raise RuntimeError('mmdet __init__.py not found for mmcv version patch')\n"
-        ),
-    ])
+    import site
+
+    old = "mmcv_maximum_version = '2.2.0'"
+    new = f"mmcv_maximum_version = '{MMDET_MMCV_MAX_VERSION}'"
+    for root in site.getsitepackages():
+        path = Path(root) / "mmdet" / "__init__.py"
+        if not path.is_file():
+            continue
+        text = path.read_text()
+        if old in text:
+            path.write_text(text.replace(old, new))
+            print(f"Patched {path} for mmcv=={MMCV_VERSION}")
+            return
+        if new in text:
+            print(f"Already patched: {path}")
+            return
+    raise RuntimeError("mmdet __init__.py not found for mmcv version patch")
 
 
 def install_mmdet() -> None:
