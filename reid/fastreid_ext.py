@@ -85,9 +85,7 @@ class FastReIDExtractor(ReIDExtractor):
 
         rgb = cv2.cvtColor(patch_bgr, cv2.COLOR_BGR2RGB)
         resized = cv2.resize(rgb, (self.width, self.height))
-        tensor = torch.from_numpy(resized).permute(2, 0, 1).float().unsqueeze(0)
-        tensor = (tensor.to(self.device) - self.pixel_mean) / self.pixel_std
-        return tensor
+        return torch.from_numpy(resized).permute(2, 0, 1).float().unsqueeze(0).to(self.device)
 
     def _encode_patches(self, patches: list[np.ndarray]) -> np.ndarray:
         if not patches:

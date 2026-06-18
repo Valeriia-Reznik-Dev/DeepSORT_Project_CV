@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FASTREID_DIR = ROOT / "third_party" / "fast_reid"
-FASTREID_TAG = "v0.2.0"
+FASTREID_TAG = "v1.3.0"
 PIP_TIMEOUT_S = 300
 
 
