@@ -3,4 +3,5 @@ numpy<2.0.0
 opencv-python
 scipy
 pyyaml
+trackeval
 # tensorflow: use Colab preinstalled (3.11+ has no TF 2.13 wheels)

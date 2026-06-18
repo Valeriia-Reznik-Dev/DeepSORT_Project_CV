@@ -27,3 +27,7 @@ sequences:
   mot16:
     - MOT16-09
     - MOT16-11
+
+eval:
+  metrics: [HOTA, CLEAR, Identity]
+  output_dir: results/eval
