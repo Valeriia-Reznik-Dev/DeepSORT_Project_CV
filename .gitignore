@@ -107,3 +107,6 @@ results/
 overlays/
 external/
 .venv/
+.venv312/
+*.pt
+Ultralytics/

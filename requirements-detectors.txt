@@ -1,0 +1,4 @@
+ultralytics>=8.0.0
+scikit-learn>=1.0.0
+torch
+torchvision
