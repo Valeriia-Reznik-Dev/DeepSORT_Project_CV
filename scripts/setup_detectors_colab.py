@@ -13,7 +13,10 @@ NANO_DIR = ROOT / "third_party" / "nanodet"
 NANO_TAG = "v1.0.0-alpha-1"  # matches nanodet-plus-m_416 checkpoint release
 NANO_COLLATE = NANO_DIR / "nanodet" / "data" / "collate.py"
 NANO_LOGGER = NANO_DIR / "nanodet" / "util" / "logger.py"
+NANO_ONE_STAGE = NANO_DIR / "nanodet" / "model" / "arch" / "one_stage_detector.py"
 TORCH_SIX_PATCH = "string_classes = (str, bytes)"
+CUDA_SYNC = "torch.cuda.synchronize()"
+CUDA_SYNC_GUARDED = "torch.cuda.synchronize() if torch.cuda.is_available() else None"
 LIGHTNING_IMPORTS_OLD = (
     "from pytorch_lightning.loggers import LightningLoggerBase\n"
     "from pytorch_lightning.loggers.base import rank_zero_experiment\n"
@@ -93,6 +96,17 @@ def patch_nanodet_for_lightning() -> None:
         print("Patched nanodet/util/logger.py for pytorch-lightning 2.x")
 
 
+def patch_nanodet_for_cpu_inference() -> None:
+    """NanoDet inference always calls torch.cuda.synchronize(), which breaks on CPU torch."""
+    if not NANO_ONE_STAGE.is_file():
+        raise FileNotFoundError(f"Missing NanoDet detector arch: {NANO_ONE_STAGE}")
+    text = NANO_ONE_STAGE.read_text()
+    if CUDA_SYNC in text and CUDA_SYNC_GUARDED not in text:
+        text = text.replace(CUDA_SYNC, CUDA_SYNC_GUARDED)
+        NANO_ONE_STAGE.write_text(text)
+        print("Patched nanodet/model/arch/one_stage_detector.py for CPU inference")
+
+
 def install_yolo() -> None:
     run([sys.executable, "-m", "pip", "install", "-q", "ultralytics", "scikit-learn"])
 
@@ -112,6 +126,7 @@ def install_nanodet() -> None:
         ])
     patch_nanodet_for_pytorch2()
     patch_nanodet_for_lightning()
+    patch_nanodet_for_cpu_inference()
     run([sys.executable, "-m", "pip", "install", "-q", "-r", str(NANO_DIR / "requirements.txt")])
     # setup.py imports nanodet before install; run editable install from repo root
     run([sys.executable, "-m", "pip", "install", "-q", "-e", str(NANO_DIR)])
@@ -134,18 +149,6 @@ def _has_gpu_runtime() -> bool:
         )
         return "NVIDIA" in out
     except (FileNotFoundError, subprocess.CalledProcessError):
-        pass
-    try:
-        subprocess.check_call(
-            [
-                sys.executable,
-                "-c",
-                "import sys, torch; sys.exit(0 if torch.cuda.is_available() else 1)",
-            ],
-            stderr=subprocess.DEVNULL,
-        )
-        return True
-    except subprocess.CalledProcessError:
         return False
 
 
