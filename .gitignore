@@ -106,6 +106,7 @@ data/
 results/
 overlays/
 external/
+third_party/
 .venv/
 .venv312/
 *.pt

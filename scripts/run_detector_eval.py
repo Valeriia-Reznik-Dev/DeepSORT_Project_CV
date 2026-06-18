@@ -25,6 +25,18 @@ def load_yaml(path: str) -> dict:
         return yaml.safe_load(f)
 
 
+def _apply_device(det_cfg: dict, device: str | None) -> None:
+    import torch
+
+    for det in det_cfg["detectors"].values():
+        if device:
+            det["device"] = device
+        elif det.get("device") in (None, "auto") and torch.cuda.is_available():
+            det["device"] = "cuda:0"
+        elif det.get("device") in (None, "auto"):
+            det["device"] = "cpu"
+
+
 def build_jobs(project_cfg: dict) -> list[tuple[str, str, str, bool]]:
     paths = project_cfg["paths"]
     jobs = []
@@ -58,9 +70,14 @@ def main() -> None:
     parser.add_argument(
         "--detector",
         nargs="+",
-        default=["yolo"],
+        default=["yolo", "nanodet", "mmdet"],
         choices=["yolo", "nanodet", "mmdet"],
-        help="One or more detectors to evaluate.",
+        help="Detectors to evaluate (default: all three).",
+    )
+    parser.add_argument(
+        "--device",
+        default=None,
+        help="Override device for all detectors, e.g. cuda:0 or cpu.",
     )
     parser.add_argument(
         "--max-frames",
@@ -73,6 +90,7 @@ def main() -> None:
     os.chdir(ROOT)
     project_cfg = load_yaml(args.project_config)
     det_cfg = load_yaml(args.config)
+    _apply_device(det_cfg, args.device)
     eval_cfg = det_cfg["detector_eval"]
     max_frames = args.max_frames if args.max_frames is not None else eval_cfg.get("max_frames")
     jobs = build_jobs(project_cfg)

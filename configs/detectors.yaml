@@ -1,23 +1,20 @@
-# Stage 3 — detector evaluation settings.
-# Sequences and MOT paths come from configs/baseline_original.yaml.
-
 detector_eval:
   iou_threshold: 0.5
   output_dir: results/detectors
-  max_frames: null  # null = all frames; set e.g. 50 for quick smoke test
+  max_frames: null  
 
 detectors:
   yolo:
     model: yolov8n.pt
     conf_threshold: 0.3
-    device: cpu
+    device: auto
   nanodet:
     config: resources/models/nanodet/nanodet-plus-m_416.yml
-    checkpoint: resources/models/nanodet/nanodet-plus-m_416_checkpoint.pth
+    checkpoint: resources/models/nanodet/nanodet-plus-m_416_checkpoint.ckpt
     conf_threshold: 0.3
-    device: cpu
+    device: auto
   mmdet:
     config: resources/models/mmdet/rtmdet_tiny_8xb32-300e_coco.py
     checkpoint: resources/models/mmdet/rtmdet_tiny_8xb32-300e_coco_20220902_112414-78e30dcc.pth
     conf_threshold: 0.3
-    device: cpu
+    device: auto
