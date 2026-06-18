@@ -13,7 +13,7 @@ paths:
   mot16_dir: resources/detections/MOT16/train
   # Precomputed / generated detection+feature .npy files
   detections_mot15: resources/detections/MOT15_train
-  detections_mot16: resources/detections/MOT16_POI_train
+  detections_mot16: resources/detections/MOT16_train
   reid_model: resources/networks/mars-small128.pb
   results_dir: results/baseline/original
   overlays_dir: overlays/original

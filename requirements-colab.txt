@@ -1,0 +1,6 @@
+# Colab only — do NOT use requirements-gpu.txt here (tensorflow[and-cuda]==2.10 fails on Colab).
+numpy<2.0.0
+opencv-python
+scipy
+pyyaml
+tensorflow==2.13.1
