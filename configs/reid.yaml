@@ -1,0 +1,20 @@
+reid_eval:
+  output_dir: results/reid
+  max_frames: null
+  max_samples: 2000
+  seed: 0
+
+reid_models:
+  osnet:
+    model_name: osnet_x1_0
+    device: auto
+    batch_size: 32
+  resnet50_ibn:
+    model_name: resnet50_ibn_a
+    device: auto
+    batch_size: 16
+  fastreid:
+    config: third_party/fast_reid/configs/Market1501/bagtricks_R50.yml
+    checkpoint: resources/models/fastreid/market_bot_R50.pth
+    device: auto
+    batch_size: 16
