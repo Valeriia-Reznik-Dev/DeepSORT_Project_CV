@@ -36,8 +36,8 @@ def _torch_version() -> str:
     ).strip()
 
 
-def _torch_major_minor(version: str) -> str:
-    return ".".join(version.split("+")[0].split(".")[:2])
+def _torch_base_version(version: str) -> str:
+    return version.split("+")[0]
 
 
 def patch_nanodet_for_pytorch2() -> None:
@@ -141,15 +141,13 @@ def _ensure_torch_for_mmcv() -> tuple[str, str]:
     """Pin PyTorch to a version with prebuilt mmcv wheels (avoids 20+ min source builds)."""
     cu_tag = "cu121" if _has_gpu_runtime() else "cpu"
     torch_ver = _torch_version()
-    torch_mm = _torch_major_minor(torch_ver)
 
-    if torch_mm != MMCV_TORCH or not _mmcv_wheel_index(cu_tag, MMCV_TORCH):
+    if _torch_base_version(torch_ver) != MMCV_TORCH or not _mmcv_wheel_index(cu_tag, MMCV_TORCH):
         print(f"Colab PyTorch {torch_ver} has no mmcv wheel; pinning torch=={MMCV_TORCH} ...")
         _pin_torch(cu_tag)
         torch_ver = _torch_version()
-        torch_mm = _torch_major_minor(torch_ver)
 
-    if torch_mm != MMCV_TORCH:
+    if _torch_base_version(torch_ver) != MMCV_TORCH:
         raise RuntimeError(
             f"Failed to pin PyTorch to {MMCV_TORCH}, still have {torch_ver}. "
             "Restart runtime and rerun setup."
