@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any, Iterator
 
 import numpy as np
-import trackeval
 import yaml
 
 DEFAULT_METRICS = ("HOTA", "CLEAR", "Identity")
@@ -68,13 +67,13 @@ def eval_plan_from_config(
                 "MOT15",
                 Path(paths["mot15_dir"]),
                 tuple(sequences["mot15"]),
-                False,
+                True,  # official TrackEval default; no effect on our MOT15 GT (verified)
             ),
             _BenchmarkSpec(
                 "MOT16",
                 Path(paths["mot16_dir"]),
                 tuple(sequences["mot16"]),
-                True,
+                True,  # required: distractor classes + ignore zones
             ),
         ),
     )
@@ -110,6 +109,8 @@ def _run_benchmark(
     output_folder: Path,
     metrics: tuple[str, ...],
 ) -> dict[str, Any]:
+    import trackeval
+
     eval_config = trackeval.Evaluator.get_default_eval_config()
     eval_config.update(
         {
