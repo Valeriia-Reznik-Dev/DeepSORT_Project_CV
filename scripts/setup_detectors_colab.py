@@ -12,7 +12,35 @@ ROOT = Path(__file__).resolve().parents[1]
 NANO_DIR = ROOT / "third_party" / "nanodet"
 NANO_TAG = "v1.0.0-alpha-1"  # matches nanodet-plus-m_416 checkpoint release
 NANO_COLLATE = NANO_DIR / "nanodet" / "data" / "collate.py"
+NANO_LOGGER = NANO_DIR / "nanodet" / "util" / "logger.py"
 TORCH_SIX_PATCH = "string_classes = (str, bytes)"
+LIGHTNING_IMPORTS_OLD = (
+    "from pytorch_lightning.loggers import LightningLoggerBase\n"
+    "from pytorch_lightning.loggers.base import rank_zero_experiment\n"
+    "from pytorch_lightning.utilities import rank_zero_only\n"
+    "from pytorch_lightning.utilities.cloud_io import get_filesystem"
+)
+LIGHTNING_IMPORTS_NEW = (
+    "try:\n"
+    "    from pytorch_lightning.loggers import Logger as LightningLoggerBase\n"
+    "except ImportError:\n"
+    "    from pytorch_lightning.loggers import LightningLoggerBase\n"
+    "\n"
+    "try:\n"
+    "    from pytorch_lightning.loggers.logger import rank_zero_experiment\n"
+    "except ImportError:\n"
+    "    from pytorch_lightning.loggers.base import rank_zero_experiment\n"
+    "\n"
+    "try:\n"
+    "    from pytorch_lightning.utilities.rank_zero import rank_zero_only\n"
+    "except ImportError:\n"
+    "    from pytorch_lightning.utilities import rank_zero_only\n"
+    "\n"
+    "try:\n"
+    "    from pytorch_lightning.utilities.cloud_io import get_filesystem\n"
+    "except ImportError:\n"
+    "    from lightning_fabric.utilities.cloud_io import get_filesystem"
+)
 MMCV_VERSION = "2.2.0"
 MMCV_TORCH = "2.4.0"
 MMDET_MMCV_MAX_VERSION = "2.3.0"  # mmdet 3.3.0 excludes mmcv==2.2.0; patch assert
@@ -54,6 +82,17 @@ def patch_nanodet_for_pytorch2() -> None:
         print("Patched nanodet/data/collate.py for PyTorch 2.x")
 
 
+def patch_nanodet_for_lightning() -> None:
+    """NanoDet v1.0.0-alpha-1 targets pytorch-lightning 1.x logger APIs."""
+    if not NANO_LOGGER.is_file():
+        raise FileNotFoundError(f"Missing NanoDet logger module: {NANO_LOGGER}")
+    text = NANO_LOGGER.read_text()
+    if LIGHTNING_IMPORTS_OLD in text:
+        text = text.replace(LIGHTNING_IMPORTS_OLD, LIGHTNING_IMPORTS_NEW)
+        NANO_LOGGER.write_text(text)
+        print("Patched nanodet/util/logger.py for pytorch-lightning 2.x")
+
+
 def install_yolo() -> None:
     run([sys.executable, "-m", "pip", "install", "-q", "ultralytics", "scikit-learn"])
 
@@ -72,10 +111,16 @@ def install_nanodet() -> None:
             str(NANO_DIR),
         ])
     patch_nanodet_for_pytorch2()
+    patch_nanodet_for_lightning()
     run([sys.executable, "-m", "pip", "install", "-q", "-r", str(NANO_DIR / "requirements.txt")])
     # setup.py imports nanodet before install; run editable install from repo root
     run([sys.executable, "-m", "pip", "install", "-q", "-e", str(NANO_DIR)])
     verify_import("nanodet")
+    run([
+        sys.executable,
+        "-c",
+        "from nanodet.model.arch import build_model; from nanodet.util import Logger, load_model_weight",
+    ])
 
     print(f"nanodet OK ({NANO_TAG})")
 
