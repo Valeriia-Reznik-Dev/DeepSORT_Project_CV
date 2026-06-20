@@ -24,7 +24,29 @@ def _ensure_fastreid_on_path() -> None:
         sys.path.insert(0, str(FASTREID_DIR))
 
 
-def _model_features(model: torch.nn.Module, tensors: torch.Tensor) -> torch.Tensor:
+def _load_fastreid_weights(model: torch.nn.Module, checkpoint_path: str) -> None:
+    """Load fast-reid .pth checkpoint without Checkpointer (cfg-safe)."""
+    ckpt = torch.load(checkpoint_path, map_location="cpu")
+    if isinstance(ckpt, dict) and "model" in ckpt:
+        state_dict = ckpt["model"]
+    else:
+        state_dict = ckpt
+    if not isinstance(state_dict, dict):
+        raise ValueError(f"Unexpected checkpoint format: {checkpoint_path}")
+
+    cleaned: dict[str, torch.Tensor] = {}
+    for key, value in state_dict.items():
+        name = key[7:] if key.startswith("module.") else key
+        cleaned[name] = value
+
+    model_state = model.state_dict()
+    filtered = {
+        k: v for k, v in cleaned.items()
+        if k in model_state and model_state[k].shape == v.shape
+    }
+    model.load_state_dict(filtered, strict=False)
+
+
     """Run fast-reid Baseline in eval mode; input is Bx3xHxW RGB float (0-255)."""
     with torch.no_grad():
         outputs = model(tensors)
@@ -47,7 +69,6 @@ class FastReIDExtractor(ReIDExtractor):
         _ensure_fastreid_on_path()
         from fastreid.config import get_cfg
         from fastreid.modeling.meta_arch import build_model
-        from fastreid.utils.checkpoint import Checkpointer
 
         self.device = torch.device(device)
         self.batch_size = batch_size
@@ -62,7 +83,7 @@ class FastReIDExtractor(ReIDExtractor):
 
         self.model = build_model(cfg)
         self.model.to(self.device)
-        Checkpointer(self.model).load(cfg.MODEL.WEIGHTS)
+        _load_fastreid_weights(self.model, checkpoint)
         self.model.eval()
 
         self.height = cfg.INPUT.SIZE_TEST[0]
