@@ -46,7 +46,7 @@ def tlwh_to_xyxy(boxes: np.ndarray) -> np.ndarray:
 
 
 def create_detector(name: str, cfg: dict) -> Detector:
-    """Factory: yolo | nanodet | mmdet."""
+    """Factory: yolo | nanodet | mmdet | yolo_seg."""
     key = name.lower()
     if key == "yolo":
         from detectors.yolo import YoloDetector
@@ -60,4 +60,10 @@ def create_detector(name: str, cfg: dict) -> Detector:
         from detectors.mmdet import MMDetDetector
 
         return MMDetDetector(**cfg)
-    raise ValueError(f"Unknown detector: {name}. Choose yolo, nanodet, or mmdet.")
+    if key == "yolo_seg":
+        from segmentation.yolo_seg import YoloSegDetector
+
+        return YoloSegDetector(**cfg)
+    raise ValueError(
+        f"Unknown detector: {name}. Choose yolo, nanodet, mmdet, or yolo_seg."
+    )

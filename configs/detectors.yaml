@@ -18,3 +18,9 @@ detectors:
     checkpoint: resources/models/mmdet/rtmdet_tiny_8xb32-300e_coco_20220902_112414-78e30dcc.pth
     conf_threshold: 0.3
     device: auto
+  # Instance segmentation (person boxes + masks); usable as a detector and for
+  # mask-based background removal before ReID (run_tracker.py --mask-background).
+  yolo_seg:
+    model: yolov8n-seg.pt
+    conf_threshold: 0.3
+    device: auto

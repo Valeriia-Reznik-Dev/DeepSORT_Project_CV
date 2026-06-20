@@ -48,7 +48,15 @@ def build_jobs(project_cfg: dict) -> list[tuple[str, str]]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run modern DeepSORT tracker")
-    parser.add_argument("--detector", default="yolo", choices=["yolo", "nanodet", "mmdet"])
+    parser.add_argument(
+        "--detector", default="yolo", choices=["yolo", "nanodet", "mmdet", "yolo_seg"]
+    )
+    parser.add_argument(
+        "--mask-background",
+        action="store_true",
+        help="Use instance masks (segmentation detector) to remove background "
+        "before ReID. Requires a segmentation detector, e.g. --detector yolo_seg.",
+    )
     parser.add_argument(
         "--reid", default="osnet", choices=["osnet", "resnet50_ibn", "fastreid"]
     )
@@ -89,11 +97,17 @@ def main() -> None:
         nn_budget=pick(args.nn_budget, "nn_budget", 100),
     )
 
-    tracker_name = args.tracker_name or f"{args.detector}_{args.reid}"
+    default_name = f"{args.detector}_{args.reid}"
+    if args.mask_background:
+        default_name += "_seg"
+    tracker_name = args.tracker_name or default_name
     output_dir = os.path.join(args.output_root, tracker_name)
     os.makedirs(output_dir, exist_ok=True)
 
-    print(f"Detector: {args.detector} | ReID: {args.reid} | tracker_name: {tracker_name}")
+    print(
+        f"Detector: {args.detector} | ReID: {args.reid} | "
+        f"mask_background: {args.mask_background} | tracker_name: {tracker_name}"
+    )
     print(f"Params: {params}")
     detector = create_detector(args.detector, det_cfg)
     reid = create_reid_extractor(args.reid, reid_cfg)
@@ -107,7 +121,13 @@ def main() -> None:
         out_file = os.path.join(output_dir, f"{seq_name}.txt")
         print(f"\nTracking {seq_name} ...")
         stats[seq_name] = track_sequence(
-            detector, reid, seq_dir, out_file, params=params, max_frames=args.max_frames
+            detector,
+            reid,
+            seq_dir,
+            out_file,
+            params=params,
+            max_frames=args.max_frames,
+            mask_background=args.mask_background,
         )
         s = stats[seq_name]
         print(

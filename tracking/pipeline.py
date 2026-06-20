@@ -17,9 +17,10 @@ from application_util import preprocessing
 from deep_sort import nn_matching
 from deep_sort.detection import Detection
 from deep_sort.tracker import Tracker
-from detectors.base import Detector
+from detectors.base import DetectionResult, Detector
 from eval.detector_metrics import _sequence_frames
 from reid.base import ReIDExtractor
+from segmentation.base import Segmenter, apply_background_removal
 
 
 @dataclass(frozen=True)
@@ -51,13 +52,19 @@ def track_sequence(
     *,
     params: TrackerParams | None = None,
     max_frames: int | None = None,
+    mask_background: bool = False,
 ) -> dict[str, float]:
     """Track one MOT sequence and write MOTChallenge results.
 
     Returns timing stats (FPS and per-stage ms), measured end-to-end excluding
     the first (warmup) frame and image I/O for the FPS figure.
+
+    If ``mask_background`` is True and ``detector`` is a :class:`Segmenter`,
+    instance masks are used to zero out background pixels before ReID feature
+    extraction (cleaner appearance descriptors).
     """
     params = params or TrackerParams()
+    use_masks = mask_background and isinstance(detector, Segmenter)
     sequence_dir = Path(sequence_dir)
     frames = _sequence_frames(sequence_dir)
     if max_frames is not None:
@@ -77,8 +84,14 @@ def track_sequence(
         if frame is None:
             continue
 
+        reid_frame = frame
         t0 = time.perf_counter()
-        raw = detector.detect(frame)
+        if use_masks:
+            segs = detector.segment(frame)
+            raw = [DetectionResult(s.tlwh, s.confidence) for s in segs]
+            reid_frame = apply_background_removal(frame, [s.mask for s in segs])
+        else:
+            raw = detector.detect(frame)
         t1 = time.perf_counter()
 
         dets = [
@@ -94,7 +107,7 @@ def track_sequence(
         )
 
         t2 = time.perf_counter()
-        features = reid.extract(frame, boxes)
+        features = reid.extract(reid_frame, boxes)
         t3 = time.perf_counter()
 
         detections = [
