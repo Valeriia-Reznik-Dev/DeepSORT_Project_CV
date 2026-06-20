@@ -15,23 +15,23 @@ FASTREID_DIR = ROOT / "third_party" / "fast_reid"
 
 
 def _ensure_fastreid_on_path() -> None:
-    if FASTREID_DIR.is_dir() and str(FASTREID_DIR) not in sys.path:
+    if not (FASTREID_DIR / "fastreid").is_dir():
+        raise FileNotFoundError(
+            f"fast-reid not found at {FASTREID_DIR}. "
+            "Run: python scripts/setup_reid_colab.py"
+        )
+    if str(FASTREID_DIR) not in sys.path:
         sys.path.insert(0, str(FASTREID_DIR))
 
 
 def _model_features(model: torch.nn.Module, tensors: torch.Tensor) -> torch.Tensor:
-    """Run fast-reid Baseline and return embedding vectors."""
-    batched_inputs = [{"image": img, "targets": torch.tensor(0)} for img in tensors]
+    """Run fast-reid Baseline in eval mode; input is Bx3xHxW RGB float (0-255)."""
     with torch.no_grad():
-        outputs = model(batched_inputs)
+        outputs = model(tensors)
     if isinstance(outputs, dict):
         if "features" in outputs:
             return outputs["features"]
         return next(v for v in outputs.values() if isinstance(v, torch.Tensor))
-    if isinstance(outputs, (list, tuple)):
-        outputs = outputs[0]
-    if isinstance(outputs, dict):
-        return outputs.get("features", next(iter(outputs.values())))
     return outputs
 
 
@@ -61,18 +61,15 @@ class FastReIDExtractor(ReIDExtractor):
         cfg.freeze()
 
         self.model = build_model(cfg)
-        Checkpointer(cfg).load(cfg.MODEL.WEIGHTS)
-        self.model.eval()
         self.model.to(self.device)
+        Checkpointer(self.model).load(cfg.MODEL.WEIGHTS)
+        self.model.eval()
 
         self.height = cfg.INPUT.SIZE_TEST[0]
         self.width = cfg.INPUT.SIZE_TEST[1]
-        self.pixel_mean = torch.tensor(cfg.MODEL.PIXEL_MEAN).view(1, 3, 1, 1).to(self.device)
-        self.pixel_std = torch.tensor(cfg.MODEL.PIXEL_STD).view(1, 3, 1, 1).to(self.device)
 
         with torch.no_grad():
             dummy = torch.zeros(1, 3, self.height, self.width, device=self.device)
-            dummy = (dummy - self.pixel_mean) / self.pixel_std
             out = _model_features(self.model, dummy)
             self._feature_dim = int(out.shape[1])
 
@@ -95,7 +92,6 @@ class FastReIDExtractor(ReIDExtractor):
         for start in range(0, len(patches), self.batch_size):
             batch = patches[start : start + self.batch_size]
             tensors = torch.cat([self._preprocess(p) for p in batch], dim=0)
-            tensors = (tensors - self.pixel_mean) / self.pixel_std
             with torch.no_grad():
                 emb = _model_features(self.model, tensors)
                 emb = F.normalize(emb, p=2, dim=1)

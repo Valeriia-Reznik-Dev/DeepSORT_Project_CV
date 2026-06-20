@@ -2,6 +2,7 @@
 """Install ReID deps for Colab: torchreid + fast-reid + sklearn."""
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -21,15 +22,34 @@ def verify_import(module: str) -> None:
     run([sys.executable, "-c", f"import {module}"])
 
 
+def _fastreid_ready() -> bool:
+    return (FASTREID_DIR / "fastreid" / "__init__.py").is_file()
+
+
 def clone_fastreid() -> None:
-    if FASTREID_DIR.is_dir():
+    if _fastreid_ready():
         print(f"OK (exists): {FASTREID_DIR}")
         return
+    if FASTREID_DIR.is_dir():
+        print(f"Removing incomplete fast-reid clone: {FASTREID_DIR}")
+        shutil.rmtree(FASTREID_DIR)
     run([
         "git", "clone", "--depth", "1", "--branch", FASTREID_TAG,
         "https://github.com/JDAI-CV/fast-reid.git",
         str(FASTREID_DIR),
     ])
+    if not _fastreid_ready():
+        raise RuntimeError(f"fast-reid clone incomplete: {FASTREID_DIR}")
+
+
+def verify_fastreid() -> None:
+    cmd = (
+        "import sys; "
+        f"sys.path.insert(0, {str(FASTREID_DIR)!r}); "
+        "import fastreid; "
+        "print('fastreid OK')"
+    )
+    run([sys.executable, "-c", cmd])
 
 
 def main() -> None:
@@ -40,9 +60,10 @@ def main() -> None:
         "tabulate",
         "termcolor",
         "yacs",
+        "prettytable",
+        "easydict",
     ])
 
-    # torchreid from official repo (pip package name: torchreid)
     run([
         sys.executable, "-m", "pip", "install", "-q",
         "--timeout", str(PIP_TIMEOUT_S),
@@ -51,13 +72,9 @@ def main() -> None:
     verify_import("torchreid")
 
     clone_fastreid()
-    run([
-        sys.executable, "-m", "pip", "install", "-q", "-e",
-        str(FASTREID_DIR),
-    ])
-    verify_import("fastreid")
+    verify_fastreid()
 
-    print("\nReID setup OK: torchreid + fastreid")
+    print("\nReID setup OK: torchreid + fastreid (sys.path, no pip install)")
 
 
 if __name__ == "__main__":
