@@ -47,6 +47,7 @@ def _load_fastreid_weights(model: torch.nn.Module, checkpoint_path: str) -> None
     model.load_state_dict(filtered, strict=False)
 
 
+def _model_features(model: torch.nn.Module, tensors: torch.Tensor) -> torch.Tensor:
     """Run fast-reid Baseline in eval mode; input is Bx3xHxW RGB float (0-255)."""
     with torch.no_grad():
         outputs = model(tensors)
