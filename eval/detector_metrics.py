@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import json
+import time
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -98,11 +99,18 @@ def evaluate_detector_on_sequence(
         frames = frames[:max_frames]
 
     tp_total = fp_total = fn_total = 0
-    for frame_idx, img_path in frames:
+    detect_time = 0.0
+    timed_frames = 0
+    for i, (frame_idx, img_path) in enumerate(frames):
         frame = cv2.imread(str(img_path))
         if frame is None:
             continue
+        start = time.perf_counter()
         dets = detector.detect(frame)
+        elapsed = time.perf_counter() - start
+        if i > 0:  # skip first frame: lazy CUDA/model warmup
+            detect_time += elapsed
+            timed_frames += 1
         det_boxes = [d.tlwh for d in dets]
         gt_boxes = gt_by_frame.get(frame_idx, [])
         tp, fp, fn = _match_frame(det_boxes, gt_boxes, iou_threshold)
@@ -117,10 +125,12 @@ def evaluate_detector_on_sequence(
         if (precision + recall)
         else 0.0
     )
+    fps = timed_frames / detect_time if detect_time > 0 else 0.0
     return {
         "precision": precision,
         "recall": recall,
         "f1": f1,
+        "fps": fps,
         "tp": tp_total,
         "fp": fp_total,
         "fn": fn_total,
@@ -139,6 +149,7 @@ def evaluate_detector(
     """Evaluate one detector on multiple sequences."""
     report: dict[str, Any] = {"detector": detector_name, "sequences": {}, "iou_threshold": iou_threshold}
     f1_values: list[float] = []
+    fps_values: list[float] = []
 
     for seq_name, sequence_dir, gt_path, is_mot16 in jobs:
         print(f"  {seq_name} ...")
@@ -152,8 +163,10 @@ def evaluate_detector(
         )
         report["sequences"][seq_name] = scores
         f1_values.append(scores["f1"])
+        fps_values.append(scores["fps"])
 
     report["f1_mean"] = float(np.mean(f1_values)) if f1_values else 0.0
+    report["fps_mean"] = float(np.mean(fps_values)) if fps_values else 0.0
     return report
 
 
@@ -174,6 +187,7 @@ def save_detector_report(reports: list[dict[str, Any]], output_dir: Path) -> dic
                 "precision": "",
                 "recall": "",
                 "f1": report["f1_mean"],
+                "fps": report["fps_mean"],
                 "tp": "",
                 "fp": "",
                 "fn": "",
@@ -181,7 +195,7 @@ def save_detector_report(reports: list[dict[str, Any]], output_dir: Path) -> dic
             }
         )
 
-    fieldnames = ["detector", "sequence", "precision", "recall", "f1", "tp", "fp", "fn", "frames"]
+    fieldnames = ["detector", "sequence", "precision", "recall", "f1", "fps", "tp", "fp", "fn", "frames"]
     with summary_csv.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -195,13 +209,17 @@ def print_detector_summary(reports: list[dict[str, Any]]) -> None:
     print("\n=== Detector F1 summary ===")
     for report in reports:
         print(f"\nDetector: {report['detector']}")
-        print(f"{'Sequence':<20} {'Prec':>8} {'Recall':>8} {'F1':>8}")
-        print("-" * 48)
+        print(f"{'Sequence':<20} {'Prec':>8} {'Recall':>8} {'F1':>8} {'FPS':>8}")
+        print("-" * 57)
         for seq, scores in sorted(report["sequences"].items()):
             print(
                 f"{seq:<20} {scores['precision']:8.3f} "
-                f"{scores['recall']:8.3f} {scores['f1']:8.3f}"
+                f"{scores['recall']:8.3f} {scores['f1']:8.3f} "
+                f"{scores.get('fps', 0.0):8.2f}"
             )
-        print("-" * 48)
+        print("-" * 57)
         n = len(report["sequences"])
-        print(f"{'MEAN (' + str(n) + ' videos)':<20} {'':>8} {'':>8} {report['f1_mean']:8.3f}")
+        print(
+            f"{'MEAN (' + str(n) + ' videos)':<20} {'':>8} {'':>8} "
+            f"{report['f1_mean']:8.3f} {report['fps_mean']:8.2f}"
+        )
