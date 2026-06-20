@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import subprocess
 import sys
 import urllib.error
@@ -112,7 +113,14 @@ def install_yolo() -> None:
     run([sys.executable, "-m", "pip", "install", "-q", "ultralytics", "scikit-learn"])
 
 
+def _nanodet_ready() -> bool:
+    return (NANO_DIR / "nanodet" / "data" / "batch_process.py").is_file()
+
+
 def install_nanodet() -> None:
+    if NANO_DIR.is_dir() and not _nanodet_ready():
+        print(f"Removing incomplete NanoDet clone: {NANO_DIR}")
+        shutil.rmtree(NANO_DIR)
     if not NANO_DIR.is_dir():
         NANO_DIR.parent.mkdir(parents=True, exist_ok=True)
         run([
@@ -135,7 +143,9 @@ def install_nanodet() -> None:
     run([
         sys.executable,
         "-c",
-        "from nanodet.model.arch import build_model; from nanodet.util import Logger, load_model_weight",
+        "from nanodet.data.batch_process import stack_batch_img; "
+        "from nanodet.model.arch import build_model; "
+        "from nanodet.util import Logger, load_model_weight",
     ])
 
     print(f"nanodet OK ({NANO_TAG})")
@@ -320,10 +330,19 @@ def main() -> None:
         action="store_true",
         help="Only re-pin torch and reinstall mmcv (after ReID setup broke MMDet).",
     )
+    parser.add_argument(
+        "--nanodet-only",
+        action="store_true",
+        help="Only clone/patch/install NanoDet (fixes missing nanodet.data).",
+    )
     args = parser.parse_args()
 
     if args.repair_mmcv_only:
         repair_mmcv_torch()
+        return
+
+    if args.nanodet_only:
+        install_nanodet()
         return
 
     install_yolo()

@@ -1,11 +1,26 @@
 """NanoDet-Plus detector (RangiLyu/nanodet)."""
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 import numpy as np
 
 from detectors.base import DetectionResult, Detector, xyxy_to_tlwh
 
 COCO_PERSON_CLASS = 0
+NANO_DIR = Path(__file__).resolve().parents[1] / "third_party" / "nanodet"
+
+
+def _ensure_nanodet_on_path() -> None:
+    if not (NANO_DIR / "nanodet" / "data").is_dir():
+        raise FileNotFoundError(
+            f"NanoDet not found at {NANO_DIR}. "
+            "Run: python scripts/setup_detectors_colab.py --nanodet-only"
+        )
+    root = str(NANO_DIR)
+    if root not in sys.path:
+        sys.path.insert(0, root)
 
 
 class NanoDetDetector(Detector):
@@ -18,6 +33,7 @@ class NanoDetDetector(Detector):
         conf_threshold: float = 0.3,
         device: str = "cpu",
     ):
+        _ensure_nanodet_on_path()
         import torch
         from nanodet.data.batch_process import stack_batch_img
         from nanodet.data.collate import naive_collate
