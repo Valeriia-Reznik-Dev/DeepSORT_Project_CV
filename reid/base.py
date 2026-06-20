@@ -67,6 +67,36 @@ def crop_person_patches(
     return patches
 
 
+def crop_person_patches_with_mask(
+    frame: np.ndarray,
+    boxes_tlwh: np.ndarray,
+    *,
+    patch_shape: tuple[int, int] = REID_PATCH_SHAPE,
+) -> tuple[list[np.ndarray], np.ndarray]:
+    """Crops + boolean mask marking which boxes produced a valid crop."""
+    boxes_tlwh = np.asarray(boxes_tlwh, dtype=np.float64)
+    mask = np.zeros(len(boxes_tlwh), dtype=bool)
+    patches: list[np.ndarray] = []
+    for i, box in enumerate(boxes_tlwh):
+        patch = extract_image_patch(frame, box, patch_shape)
+        if patch is not None:
+            patches.append(patch)
+            mask[i] = True
+    return patches, mask
+
+
+def scatter_features(
+    encoded: np.ndarray,
+    mask: np.ndarray,
+    feature_dim: int,
+) -> np.ndarray:
+    """Place encoded rows back into a full NxD matrix (zeros for invalid boxes)."""
+    full = np.zeros((len(mask), feature_dim), dtype=np.float32)
+    if encoded.size:
+        full[mask] = encoded
+    return full
+
+
 def l2_normalize(features: np.ndarray) -> np.ndarray:
     features = np.asarray(features, dtype=np.float32)
     if features.size == 0:

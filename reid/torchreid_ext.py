@@ -6,7 +6,12 @@ import torch
 import torch.nn.functional as F
 from torchvision import transforms
 
-from reid.base import REID_PATCH_SHAPE, ReIDExtractor, crop_person_patches, l2_normalize
+from reid.base import (
+    REID_PATCH_SHAPE,
+    ReIDExtractor,
+    crop_person_patches_with_mask,
+    scatter_features,
+)
 
 
 class TorchReIDExtractor(ReIDExtractor):
@@ -74,26 +79,6 @@ class TorchReIDExtractor(ReIDExtractor):
         if boxes_tlwh.size == 0:
             return np.zeros((0, self.feature_dim), dtype=np.float32)
 
-        patches = crop_person_patches(frame, boxes_tlwh)
-        if len(patches) != len(boxes_tlwh):
-            # Keep row alignment: invalid crops -> zero vector (rare at GT boxes).
-            aligned: list[np.ndarray | None] = []
-            for box in boxes_tlwh:
-                from reid.base import extract_image_patch
-
-                aligned.append(extract_image_patch(frame, box))
-            patches = [p for p in aligned if p is not None]
-            features = self._encode_patches(patches)
-            if len(patches) == len(boxes_tlwh):
-                return l2_normalize(features)
-
-            full = np.zeros((len(boxes_tlwh), self.feature_dim), dtype=np.float32)
-            j = 0
-            for i, patch in enumerate(aligned):
-                if patch is None:
-                    continue
-                full[i] = features[j]
-                j += 1
-            return l2_normalize(full)
-
-        return l2_normalize(self._encode_patches(patches))
+        patches, mask = crop_person_patches_with_mask(frame, boxes_tlwh)
+        encoded = self._encode_patches(patches)  # already L2-normalized
+        return scatter_features(encoded, mask, self.feature_dim)

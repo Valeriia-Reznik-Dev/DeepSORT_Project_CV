@@ -8,7 +8,11 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from reid.base import ReIDExtractor, crop_person_patches, l2_normalize
+from reid.base import (
+    ReIDExtractor,
+    crop_person_patches_with_mask,
+    scatter_features,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 FASTREID_DIR = ROOT / "third_party" / "fast_reid"
@@ -124,5 +128,8 @@ class FastReIDExtractor(ReIDExtractor):
         boxes_tlwh = np.asarray(boxes_tlwh, dtype=np.float64)
         if boxes_tlwh.size == 0:
             return np.zeros((0, self.feature_dim), dtype=np.float32)
-        patches = crop_person_patches(frame, boxes_tlwh, patch_shape=(self.height, self.width))
-        return l2_normalize(self._encode_patches(patches))
+        patches, mask = crop_person_patches_with_mask(
+            frame, boxes_tlwh, patch_shape=(self.height, self.width)
+        )
+        encoded = self._encode_patches(patches)  # already L2-normalized
+        return scatter_features(encoded, mask, self.feature_dim)
