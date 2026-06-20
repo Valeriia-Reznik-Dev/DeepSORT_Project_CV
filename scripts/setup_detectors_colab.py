@@ -2,6 +2,7 @@
 """Install YOLO + NanoDet + MMDet for Colab (with import checks)."""
 from __future__ import annotations
 
+import argparse
 import subprocess
 import sys
 import urllib.error
@@ -278,7 +279,53 @@ def install_mmdet() -> None:
     print(f"mmdet OK (mmcv=={MMCV_VERSION}, {cu_tag}/torch{torch_tag})")
 
 
+def repair_mmcv_torch() -> None:
+    """Re-pin torch and reinstall mmcv wheel (fixes undefined symbol in _ext.so)."""
+    cu_tag, torch_tag = _ensure_torch_for_mmcv()
+    mmcv_index = _mmcv_wheel_index(cu_tag, torch_tag)
+    if mmcv_index is None:
+        raise RuntimeError(
+            f"No prebuilt mmcv=={MMCV_VERSION} wheel for {cu_tag}/torch{torch_tag}."
+        )
+
+    print(f"Reinstalling mmcv=={MMCV_VERSION} for torch {torch_tag} ({cu_tag}) ...")
+    run([
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "-q",
+        "--timeout",
+        str(PIP_TIMEOUT_S),
+        "--force-reinstall",
+        f"mmcv=={MMCV_VERSION}",
+        "-f",
+        mmcv_index,
+        "--only-binary",
+        "mmcv",
+    ])
+    _patch_mmdet_mmcv_check()
+    verify_import("mmcv")
+    try:
+        verify_import("mmdet")
+        print("mmcv/mmdet import OK after repair.")
+    except subprocess.CalledProcessError:
+        print("mmcv OK; mmdet not installed (skip mmdet verify).")
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Install detector deps for Colab")
+    parser.add_argument(
+        "--repair-mmcv-only",
+        action="store_true",
+        help="Only re-pin torch and reinstall mmcv (after ReID setup broke MMDet).",
+    )
+    args = parser.parse_args()
+
+    if args.repair_mmcv_only:
+        repair_mmcv_torch()
+        return
+
     install_yolo()
     install_nanodet()
     install_mmdet()

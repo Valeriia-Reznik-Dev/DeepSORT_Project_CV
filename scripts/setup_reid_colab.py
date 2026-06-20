@@ -11,6 +11,20 @@ ROOT = Path(__file__).resolve().parents[1]
 FASTREID_DIR = ROOT / "third_party" / "fast_reid"
 FASTREID_TAG = "v1.3.0"
 PIP_TIMEOUT_S = 300
+TORCHREID_DEPS = [
+    "Cython",
+    "h5py",
+    "Pillow",
+    "six",
+    "scipy",
+    "opencv-python",
+    "matplotlib",
+    "future",
+    "yacs",
+    "gdown",
+    "imageio",
+    "chardet",
+]
 
 
 def run(cmd: list[str], *, cwd: Path | None = None) -> None:
@@ -52,6 +66,38 @@ def verify_fastreid() -> None:
     run([sys.executable, "-c", cmd])
 
 
+def install_torchreid() -> None:
+    """Install torchreid without letting pip upgrade the pinned torch/mmcv stack."""
+    run([
+        sys.executable, "-m", "pip", "install", "-q",
+        "--timeout", str(PIP_TIMEOUT_S),
+        *TORCHREID_DEPS,
+    ])
+    run([
+        sys.executable, "-m", "pip", "install", "-q",
+        "--timeout", str(PIP_TIMEOUT_S),
+        "--no-deps",
+        "git+https://github.com/KaiyangZhou/deep-person-reid.git",
+    ])
+    verify_import("torchreid")
+
+
+def repair_mmcv_if_present() -> None:
+    """torchreid/fast-reid pip deps can bump torch and break prebuilt mmcv ops."""
+    probe = subprocess.run(
+        [sys.executable, "-c", "import mmcv"],
+        capture_output=True,
+    )
+    if probe.returncode != 0:
+        return
+    print("mmcv detected — repairing torch/mmcv compatibility for MMDet ...")
+    run([
+        sys.executable,
+        str(ROOT / "scripts" / "setup_detectors_colab.py"),
+        "--repair-mmcv-only",
+    ])
+
+
 def main() -> None:
     run([
         sys.executable, "-m", "pip", "install", "-q",
@@ -64,15 +110,11 @@ def main() -> None:
         "easydict",
     ])
 
-    run([
-        sys.executable, "-m", "pip", "install", "-q",
-        "--timeout", str(PIP_TIMEOUT_S),
-        "git+https://github.com/KaiyangZhou/deep-person-reid.git",
-    ])
-    verify_import("torchreid")
+    install_torchreid()
 
     clone_fastreid()
     verify_fastreid()
+    repair_mmcv_if_present()
 
     print("\nReID setup OK: torchreid + fastreid (sys.path, no pip install)")
 
