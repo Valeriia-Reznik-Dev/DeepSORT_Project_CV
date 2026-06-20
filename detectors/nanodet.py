@@ -1,6 +1,8 @@
 """NanoDet-Plus detector (RangiLyu/nanodet)."""
 from __future__ import annotations
 
+import contextlib
+import io
 import sys
 from pathlib import Path
 
@@ -78,7 +80,8 @@ class NanoDetDetector(Detector):
         meta = self._collate([meta])
         meta["img"] = self._stack(meta["img"], divisible=32)
 
-        with torch.no_grad():
+
+        with torch.no_grad(), contextlib.redirect_stdout(io.StringIO()):
             results = self.model.inference(meta)
 
         dets = results[0]
