@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install YOLO + NanoDet + MMDet for Colab (with import checks)."""
+"""Install YOLO, NanoDet, MMDet for Colab."""
 from __future__ import annotations
 
 import argparse
@@ -58,7 +58,6 @@ def run(cmd: list[str], *, cwd: Path | None = None) -> None:
 
 
 def verify_import(module: str) -> None:
-    """Import in a fresh subprocess (editable installs are not always visible in-process)."""
     run([sys.executable, "-c", f"import {module}"])
 
 
@@ -74,7 +73,6 @@ def _torch_base_version(version: str) -> str:
 
 
 def patch_nanodet_for_pytorch2() -> None:
-    """NanoDet v1.0.0-alpha-1 uses torch._six, removed in PyTorch 2.0+."""
     if not NANO_COLLATE.is_file():
         raise FileNotFoundError(f"Missing NanoDet collate module: {NANO_COLLATE}")
     text = NANO_COLLATE.read_text()
@@ -88,7 +86,6 @@ def patch_nanodet_for_pytorch2() -> None:
 
 
 def patch_nanodet_for_lightning() -> None:
-    """NanoDet v1.0.0-alpha-1 targets pytorch-lightning 1.x logger APIs."""
     if not NANO_LOGGER.is_file():
         raise FileNotFoundError(f"Missing NanoDet logger module: {NANO_LOGGER}")
     text = NANO_LOGGER.read_text()
@@ -99,7 +96,6 @@ def patch_nanodet_for_lightning() -> None:
 
 
 def patch_nanodet_for_cpu_inference() -> None:
-    """NanoDet inference always calls torch.cuda.synchronize(), which breaks on CPU torch."""
     if not NANO_ONE_STAGE.is_file():
         raise FileNotFoundError(f"Missing NanoDet detector arch: {NANO_ONE_STAGE}")
     text = NANO_ONE_STAGE.read_text()
@@ -197,7 +193,6 @@ def _pin_torch(cu_tag: str) -> None:
 
 
 def _ensure_torch_for_mmcv() -> tuple[str, str]:
-    """Pin PyTorch to a version with prebuilt mmcv wheels (avoids 20+ min source builds)."""
     cu_tag = "cu121" if _has_gpu_runtime() else "cpu"
     torch_ver = _torch_version()
 
@@ -221,7 +216,6 @@ def _ensure_torch_for_mmcv() -> tuple[str, str]:
 
 
 def _patch_mmdet_mmcv_check() -> None:
-    """mmdet 3.3.0 rejects mmcv==2.2.0; loosen the hard-coded upper bound."""
     import site
 
     old = "mmcv_maximum_version = '2.2.0'"
@@ -290,7 +284,6 @@ def install_mmdet() -> None:
 
 
 def repair_mmcv_torch() -> None:
-    """Re-pin torch and reinstall mmcv wheel (fixes undefined symbol in _ext.so)."""
     cu_tag, torch_tag = _ensure_torch_for_mmcv()
     mmcv_index = _mmcv_wheel_index(cu_tag, torch_tag)
     if mmcv_index is None:

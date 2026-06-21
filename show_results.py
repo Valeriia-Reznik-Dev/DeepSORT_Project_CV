@@ -14,26 +14,6 @@ DEFAULT_UPDATE_MS = 20
 
 def run(sequence_dir, result_file, show_false_alarms=False, detection_file=None,
         update_ms=None, video_filename=None):
-    """Run tracking result visualization.
-
-    Parameters
-    ----------
-    sequence_dir : str
-        Path to the MOTChallenge sequence directory.
-    result_file : str
-        Path to the tracking output file in MOTChallenge ground truth format.
-    show_false_alarms : Optional[bool]
-        If True, false alarms are highlighted as red boxes.
-    detection_file : Optional[str]
-        Path to the detection file.
-    update_ms : Optional[int]
-        Number of milliseconds between cosecutive frames. Defaults to (a) the
-        frame rate specifid in the seqinfo.ini file or DEFAULT_UDPATE_MS ms if
-        seqinfo.ini is not available.
-    video_filename : Optional[Str]
-        If not None, a video of the tracking results is written to this file.
-
-    """
     seq_info = deep_sort_app.gather_sequence_info(sequence_dir, detection_file)
     results = np.loadtxt(result_file, delimiter=',')
 
@@ -81,8 +61,6 @@ def run(sequence_dir, result_file, show_false_alarms=False, detection_file=None,
 
 
 def parse_args():
-    """ Parse command line arguments.
-    """
     parser = argparse.ArgumentParser(description="Siamese Tracking")
     parser.add_argument(
         "--sequence_dir", help="Path to the MOTChallenge sequence directory.",

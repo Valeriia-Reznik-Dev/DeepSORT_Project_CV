@@ -1,4 +1,4 @@
-"""RTMDet / MMDetection detector (open-mmlab/mmdetection)."""
+"""RTMDet / MMDetection detector."""
 from __future__ import annotations
 
 import numpy as np
@@ -9,8 +9,6 @@ COCO_PERSON_CLASS = 0
 
 
 class MMDetDetector(Detector):
-    """Requires: pip install -U openmim && mim install mmdet mmcv"""
-
     def __init__(
         self,
         config: str,

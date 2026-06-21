@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install ReID deps for Colab: torchreid + fast-reid + sklearn."""
+"""Install ReID deps for Colab."""
 from __future__ import annotations
 
 import shutil
@@ -67,7 +67,6 @@ def verify_fastreid() -> None:
 
 
 def install_torchreid() -> None:
-    """Install torchreid without letting pip upgrade the pinned torch/mmcv stack."""
     run([
         sys.executable, "-m", "pip", "install", "-q",
         "--timeout", str(PIP_TIMEOUT_S),
@@ -83,7 +82,6 @@ def install_torchreid() -> None:
 
 
 def repair_mmcv_if_present() -> None:
-    """torchreid/fast-reid pip deps can bump torch and break prebuilt mmcv ops."""
     probe = subprocess.run(
         [sys.executable, "-c", "import mmcv"],
         capture_output=True,

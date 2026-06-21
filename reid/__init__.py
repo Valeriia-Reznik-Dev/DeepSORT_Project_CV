@@ -1,4 +1,4 @@
-"""ReID feature extractors (Stage 4)."""
+"""ReID feature extractors."""
 
 from reid.base import ReIDExtractor, create_reid_extractor
 

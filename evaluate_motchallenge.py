@@ -5,8 +5,6 @@ import deep_sort_app
 
 
 def parse_args():
-    """ Parse command line arguments.
-    """
     parser = argparse.ArgumentParser(description="MOTChallenge evaluation")
     parser.add_argument(
         "--mot_dir", help="Path to MOTChallenge directory (train or test)",

@@ -1,0 +1,12 @@
+# Standalone body-ReID identity DB (Additional task).
+# Enable in the tracker with: python scripts/run_tracker.py --identity ...
+
+identity:
+  radius: 0.3
+  k: 1
+  representation: centroid  # centroid | knn
+  window: 30
+  conflict_policy: distance  # distance | none
+  max_per_identity: 50
+  # Optional separate ReID for the identity gallery (null = reuse tracker ReID features).
+  reid_model: null  # osnet | resnet50_ibn | fastreid

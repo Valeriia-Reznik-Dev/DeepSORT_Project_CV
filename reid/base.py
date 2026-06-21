@@ -1,4 +1,4 @@
-"""ReID interface, crop helpers, and factory."""
+"""ReID interface and factory."""
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -10,8 +10,6 @@ REID_PATCH_SHAPE = (256, 128)
 
 
 class ReIDExtractor(ABC):
-    """Extract L2-normalized descriptors from person crops."""
-
     @property
     @abstractmethod
     def feature_dim(self) -> int:
@@ -19,7 +17,6 @@ class ReIDExtractor(ABC):
 
     @abstractmethod
     def extract(self, frame: np.ndarray, boxes_tlwh: np.ndarray) -> np.ndarray:
-        """BGR frame + Nx4 tlwh boxes -> NxD float32 features (L2-normalized)."""
         raise NotImplementedError
 
 
@@ -28,7 +25,6 @@ def extract_image_patch(
     bbox: np.ndarray,
     patch_shape: tuple[int, int] = REID_PATCH_SHAPE,
 ) -> np.ndarray | None:
-    """Crop and resize a person patch (same logic as original DeepSORT tools)."""
     bbox = np.asarray(bbox, dtype=np.float64).copy()
     target_aspect = float(patch_shape[1]) / patch_shape[0]
     new_width = target_aspect * bbox[3]
@@ -55,7 +51,6 @@ def crop_person_patches(
     *,
     patch_shape: tuple[int, int] = REID_PATCH_SHAPE,
 ) -> list[np.ndarray]:
-    """Return valid BGR crops for each tlwh box (skip invalid boxes)."""
     boxes_tlwh = np.asarray(boxes_tlwh, dtype=np.float64)
     if boxes_tlwh.size == 0:
         return []
@@ -73,7 +68,6 @@ def crop_person_patches_with_mask(
     *,
     patch_shape: tuple[int, int] = REID_PATCH_SHAPE,
 ) -> tuple[list[np.ndarray], np.ndarray]:
-    """Crops + boolean mask marking which boxes produced a valid crop."""
     boxes_tlwh = np.asarray(boxes_tlwh, dtype=np.float64)
     mask = np.zeros(len(boxes_tlwh), dtype=bool)
     patches: list[np.ndarray] = []
@@ -90,7 +84,6 @@ def scatter_features(
     mask: np.ndarray,
     feature_dim: int,
 ) -> np.ndarray:
-    """Place encoded rows back into a full NxD matrix (zeros for invalid boxes)."""
     full = np.zeros((len(mask), feature_dim), dtype=np.float32)
     if encoded.size:
         full[mask] = encoded
@@ -107,7 +100,6 @@ def l2_normalize(features: np.ndarray) -> np.ndarray:
 
 
 def create_reid_extractor(name: str, cfg: dict) -> ReIDExtractor:
-    """Factory: osnet | resnet50_ibn | fastreid."""
     key = name.lower()
     cfg = dict(cfg)
     if key == "osnet":

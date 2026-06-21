@@ -24,3 +24,20 @@ detectors:
     model: yolov8n-seg.pt
     conf_threshold: 0.3
     device: auto
+  # Mask R-CNN (detectron2) — quality mode, slower than YOLO-seg.
+  detectron2_seg:
+    config: COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml
+    weights: null
+    conf_threshold: 0.5
+    device: auto
+  # SMP semantic person seg + connected components (Cityscapes weights).
+  smp_seg:
+    arch: DeepLabV3Plus
+    encoder: resnet50
+    encoder_weights: imagenet
+    classes: 19
+    person_class: 11
+    checkpoint: resources/models/smp/deeplabv3plus_cityscapes.pth
+    conf_threshold: 0.5
+    min_area: 400
+    device: auto

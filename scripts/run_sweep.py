@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Sweep detector x ReID combos: run tracker + HOTA, compare with baseline.
-
-Produces one summary table (per-video HOTA, mean HOTA, mean FPS, whether the
-combo beats the baseline on EVERY video) and saves it to CSV/JSON.
-"""
+"""Sweep detector x ReID combos vs baseline."""
 from __future__ import annotations
 
 import argparse
@@ -52,7 +48,6 @@ def build_jobs(project_cfg: dict) -> list[tuple[str, str]]:
 
 
 def _eval_hota(project_cfg: dict, tracker_name: str, results_dir: str) -> dict[str, float]:
-    """Return {seq: HOTA, ..., 'MEAN': mean} for a results folder."""
     plan = eval_plan_from_config(project_cfg, tracker_name=tracker_name, results_dir=results_dir)
     report = run_eval_plan(plan, use_symlinks=False)
     data = report["trackers"][tracker_name]
@@ -71,8 +66,9 @@ def run_combo(
     device: str | None,
     output_root: str,
     max_frames: int | None,
-) -> tuple[dict[str, float], float]:
-    name = f"{detector_name}_{reid_name}"
+    mask_background: bool = False,
+) -> tuple[str, dict[str, float], float]:
+    name = f"{detector_name}_{reid_name}" + ("_seg" if mask_background else "")
     out_dir = os.path.join(output_root, name)
     os.makedirs(out_dir, exist_ok=True)
 
@@ -88,19 +84,24 @@ def run_combo(
             continue
         out_file = os.path.join(out_dir, f"{seq_name}.txt")
         stats = track_sequence(
-            detector, reid, seq_dir, out_file, params=params, max_frames=max_frames
+            detector, reid, seq_dir, out_file, params=params,
+            max_frames=max_frames, mask_background=mask_background,
         )
         fps_values.append(stats["fps"])
         print(f"  {seq_name}: {stats['fps']:.2f} FPS")
 
     mean_fps = sum(fps_values) / len(fps_values) if fps_values else 0.0
     hota = _eval_hota(project_cfg, name, out_dir)
-    return hota, mean_fps
+    return name, hota, mean_fps
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Sweep detector x ReID combos")
-    parser.add_argument("--combos", nargs="+", default=DEFAULT_COMBOS, help="detector:reid pairs")
+    parser.add_argument(
+        "--combos", nargs="+", default=DEFAULT_COMBOS,
+        help="detector:reid pairs; add ':seg' for mask-based bg removal, "
+        "e.g. yolo_seg:osnet:seg",
+    )
     parser.add_argument("--project-config", default=os.path.join(ROOT, "configs", "baseline_original.yaml"))
     parser.add_argument("--detectors-config", default=os.path.join(ROOT, "configs", "detectors.yaml"))
     parser.add_argument("--reid-config", default=os.path.join(ROOT, "configs", "reid.yaml"))
@@ -140,17 +141,20 @@ def main() -> None:
 
     rows: list[dict] = []
     for combo in args.combos:
-        detector_name, reid_name = combo.split(":")
-        print(f"\n=== Combo: {detector_name} + {reid_name} ===")
-        hota, mean_fps = run_combo(
+        tokens = combo.split(":")
+        detector_name, reid_name = tokens[0], tokens[1]
+        mask_background = len(tokens) > 2 and tokens[2] == "seg"
+        tag = f"{detector_name} + {reid_name}" + (" + seg-masks" if mask_background else "")
+        print(f"\n=== Combo: {tag} ===")
+        name, hota, mean_fps = run_combo(
             detector_name, reid_name, project_cfg, det_cfg_all, reid_cfg_all,
-            params, args.device, args.output_root, args.max_frames,
+            params, args.device, args.output_root, args.max_frames, mask_background,
         )
         beats_all = None
         if baseline is not None:
             beats_all = all(hota.get(s, 0.0) > baseline.get(s, 0.0) for s in seq_order)
         rows.append({
-            "combo": f"{detector_name}+{reid_name}",
+            "combo": name,
             "hota": hota,
             "mean_fps": mean_fps,
             "beats_all": beats_all,

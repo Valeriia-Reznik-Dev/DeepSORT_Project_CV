@@ -1,4 +1,4 @@
-"""Evaluation utilities (lazy imports — no TrackEval required until run)."""
+"""Evaluation helpers (lazy TrackEval import)."""
 
 from typing import Any
 

@@ -1,10 +1,4 @@
-"""Standalone identity-DB evaluation on MOT GT crops (label-based metrics).
-
-Feeds GT pedestrian crops frame-by-frame into the online IdentityManager (GT
-track_id plays the role of the tracker's track), then compares the assigned
-identities to the GT ids with clustering metrics. Two label sets are reported:
-``db_raw`` (per-crop DB identity) and ``resolved`` (after window vote + conflict).
-"""
+"""Identity DB metrics on GT crops."""
 from __future__ import annotations
 
 import csv

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate person detectors (P/R/F1 vs MOT GT) on project sequences."""
+"""Evaluate detectors (P/R/F1 vs GT)."""
 from __future__ import annotations
 
 import argparse

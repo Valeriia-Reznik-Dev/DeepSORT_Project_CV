@@ -1,4 +1,4 @@
-"""torchreid models (OSNet, ResNet50-IBN) — KaiyangZhou/deep-person-reid."""
+"""torchreid adapter (OSNet, ResNet50-IBN)."""
 from __future__ import annotations
 
 import numpy as np

@@ -12,8 +12,6 @@ def convert(filename_in, filename_out, ffmpeg_executable="ffmpeg"):
 
 
 def parse_args():
-    """ Parse command line arguments.
-    """
     parser = argparse.ArgumentParser(description="Siamese Tracking")
     parser.add_argument(
         "--mot_dir", help="Path to MOTChallenge directory (train or test)",

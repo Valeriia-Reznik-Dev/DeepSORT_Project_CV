@@ -1,1 +1,1 @@
-"""Instance segmentation models that also act as person detectors."""
+"""Person segmenters (usable as detectors)."""

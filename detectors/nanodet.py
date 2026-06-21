@@ -1,4 +1,4 @@
-"""NanoDet-Plus detector (RangiLyu/nanodet)."""
+"""NanoDet-Plus detector."""
 from __future__ import annotations
 
 import contextlib
@@ -26,8 +26,6 @@ def _ensure_nanodet_on_path() -> None:
 
 
 class NanoDetDetector(Detector):
-    """Requires scripts/setup_detectors_colab.py or clone+setup.py develop."""
-
     def __init__(
         self,
         config: str,

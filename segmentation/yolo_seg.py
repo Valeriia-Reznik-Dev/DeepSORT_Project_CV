@@ -1,10 +1,4 @@
-"""YOLOv8-seg instance segmentation (ultralytics).
-
-Same backend as :class:`detectors.yolo.YoloDetector`, but additionally returns
-per-person instance masks. Implements both ``Detector`` (boxes only) and
-``Segmenter`` (boxes + masks), so it can be selected as a plain detector or used
-with mask-based background removal in the tracking pipeline.
-"""
+"""YOLOv8-seg detector."""
 from __future__ import annotations
 
 import numpy as np
@@ -29,7 +23,6 @@ class YoloSegDetector(Detector, Segmenter):
         self.device = device
 
     def _predict(self, frame: np.ndarray):
-        # retina_masks=True returns masks at the original frame resolution.
         return self.model.predict(
             frame,
             conf=self.conf_threshold,

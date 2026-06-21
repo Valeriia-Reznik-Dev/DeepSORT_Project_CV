@@ -1,4 +1,4 @@
-"""Detector quality metrics: Precision / Recall / F1 vs MOT GT."""
+"""Detector P/R/F1 vs MOT GT."""
 from __future__ import annotations
 
 import csv
@@ -19,7 +19,6 @@ MOT16_PEDESTRIAN_CLASS = 1
 
 
 def load_mot_gt(gt_path: str | Path, *, is_mot16: bool) -> dict[int, list[np.ndarray]]:
-    """Load GT boxes per frame (1-indexed). Returns frame -> list of tlwh."""
     gt_path = Path(gt_path)
     if not gt_path.is_file():
         raise FileNotFoundError(gt_path)
@@ -48,7 +47,6 @@ def _match_frame(
     ground_truth: list[np.ndarray],
     iou_threshold: float,
 ) -> tuple[int, int, int]:
-    """Return TP, FP, FN for one frame via IoU + Hungarian assignment."""
     n_det, n_gt = len(detections), len(ground_truth)
     if n_det == 0:
         return 0, 0, n_gt
@@ -91,7 +89,6 @@ def evaluate_detector_on_sequence(
     iou_threshold: float = 0.5,
     max_frames: int | None = None,
 ) -> dict[str, float]:
-    """Run detector on sequence frames and compute aggregate P/R/F1."""
     sequence_dir = Path(sequence_dir)
     gt_by_frame = load_mot_gt(gt_path, is_mot16=is_mot16)
     frames = _sequence_frames(sequence_dir)
@@ -108,7 +105,7 @@ def evaluate_detector_on_sequence(
         start = time.perf_counter()
         dets = detector.detect(frame)
         elapsed = time.perf_counter() - start
-        if i > 0:  # skip first frame: lazy CUDA/model warmup
+        if i > 0:
             detect_time += elapsed
             timed_frames += 1
         det_boxes = [d.tlwh for d in dets]
@@ -146,7 +143,6 @@ def evaluate_detector(
     iou_threshold: float = 0.5,
     max_frames: int | None = None,
 ) -> dict[str, Any]:
-    """Evaluate one detector on multiple sequences."""
     report: dict[str, Any] = {"detector": detector_name, "sequences": {}, "iou_threshold": iou_threshold}
     f1_values: list[float] = []
     fps_values: list[float] = []

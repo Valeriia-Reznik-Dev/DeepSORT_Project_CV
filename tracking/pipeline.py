@@ -1,11 +1,7 @@
-"""Run detector + ReID through the original DeepSORT core on a MOT sequence.
-
-This replaces the precomputed ``det.txt`` + ``.npy`` inputs of the upstream
-``deep_sort_app`` with live detections and appearance descriptors, while keeping
-the original Kalman filter / matching cascade / Tracker untouched.
-"""
+"""Live detections + ReID through DeepSORT core."""
 from __future__ import annotations
 
+import csv
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,14 +15,13 @@ from deep_sort.detection import Detection
 from deep_sort.tracker import Tracker
 from detectors.base import DetectionResult, Detector
 from eval.detector_metrics import _sequence_frames
+from identity.manager import IdentityManager
 from reid.base import ReIDExtractor
 from segmentation.base import Segmenter, apply_background_removal
 
 
 @dataclass(frozen=True)
 class TrackerParams:
-    """DeepSORT tracker parameters (per-video tunable)."""
-
     min_confidence: float = 0.3
     min_detection_height: int = 0
     nms_max_overlap: float = 1.0
@@ -44,6 +39,38 @@ def _write_mot(output_file: Path, results: list[list[float]]) -> None:
             )
 
 
+def _write_identity_sidecar(
+    output_file: Path,
+    rows: list[tuple[int, int, int, int]],
+) -> None:
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    with output_file.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["frame", "track_id", "identity_raw", "identity_resolved"])
+        writer.writerows(rows)
+
+
+def _active_track_descriptors(
+    tracker: Tracker,
+    reid_frame: np.ndarray,
+    *,
+    identity_reid: ReIDExtractor | None,
+) -> list[tuple[int, np.ndarray]]:
+    entries: list[tuple[int, np.ndarray]] = []
+    for track in tracker.tracks:
+        if not track.is_confirmed() or track.time_since_update != 0:
+            continue
+        if identity_reid is not None:
+            box = track.to_tlwh().reshape(1, 4)
+            desc = identity_reid.extract(reid_frame, box)[0]
+        elif track.features:
+            desc = track.features[-1]
+        else:
+            continue
+        entries.append((track.track_id, np.asarray(desc, dtype=np.float32)))
+    return entries
+
+
 def track_sequence(
     detector: Detector,
     reid: ReIDExtractor,
@@ -53,18 +80,14 @@ def track_sequence(
     params: TrackerParams | None = None,
     max_frames: int | None = None,
     mask_background: bool = False,
+    gt_detections: dict[int, np.ndarray] | None = None,
+    identity_manager: IdentityManager | None = None,
+    identity_reid: ReIDExtractor | None = None,
+    identity_output: str | Path | None = None,
 ) -> dict[str, float]:
-    """Track one MOT sequence and write MOTChallenge results.
-
-    Returns timing stats (FPS and per-stage ms), measured end-to-end excluding
-    the first (warmup) frame and image I/O for the FPS figure.
-
-    If ``mask_background`` is True and ``detector`` is a :class:`Segmenter`,
-    instance masks are used to zero out background pixels before ReID feature
-    extraction (cleaner appearance descriptors).
-    """
     params = params or TrackerParams()
-    use_masks = mask_background and isinstance(detector, Segmenter)
+    use_gt = gt_detections is not None
+    use_masks = mask_background and isinstance(detector, Segmenter) and not use_gt
     sequence_dir = Path(sequence_dir)
     frames = _sequence_frames(sequence_dir)
     if max_frames is not None:
@@ -75,8 +98,9 @@ def track_sequence(
     )
     tracker = Tracker(metric)
     results: list[list[float]] = []
+    identity_rows: list[tuple[int, int, int, int]] = []
 
-    det_time = reid_time = track_time = pipe_time = 0.0
+    det_time = reid_time = track_time = identity_time = pipe_time = 0.0
     timed_frames = 0
 
     for i, (frame_idx, img_path) in enumerate(frames):
@@ -86,7 +110,10 @@ def track_sequence(
 
         reid_frame = frame
         t0 = time.perf_counter()
-        if use_masks:
+        if use_gt:
+            gt_boxes = gt_detections.get(frame_idx, np.zeros((0, 4)))
+            raw = [DetectionResult(np.asarray(b, dtype=np.float64), 1.0) for b in gt_boxes]
+        elif use_masks:
             segs = detector.segment(frame)
             raw = [DetectionResult(s.tlwh, s.confidence) for s in segs]
             reid_frame = apply_background_removal(frame, [s.mask for s in segs])
@@ -126,11 +153,29 @@ def track_sequence(
         tracker.update(detections)
         t4 = time.perf_counter()
 
-        if i > 0:  # skip warmup frame (lazy CUDA/model init)
+        t5 = t4
+        if identity_manager is not None:
+            id_entries = _active_track_descriptors(
+                tracker, reid_frame, identity_reid=identity_reid
+            )
+            resolved, raw_ids = identity_manager.update(frame_idx, id_entries)
+            for track_id, _ in id_entries:
+                identity_rows.append(
+                    (
+                        frame_idx,
+                        track_id,
+                        raw_ids[track_id],
+                        resolved[track_id],
+                    )
+                )
+            t5 = time.perf_counter()
+
+        if i > 0:
             det_time += t1 - t0
             reid_time += t3 - t2
             track_time += t4 - t3
-            pipe_time += (t1 - t0) + (t3 - t2) + (t4 - t3)
+            identity_time += t5 - t4
+            pipe_time += (t1 - t0) + (t3 - t2) + (t4 - t3) + (t5 - t4)
             timed_frames += 1
 
         for track in tracker.tracks:
@@ -140,6 +185,8 @@ def track_sequence(
             results.append([frame_idx, track.track_id, x, y, w, h])
 
     _write_mot(Path(output_file), results)
+    if identity_manager is not None and identity_output is not None:
+        _write_identity_sidecar(Path(identity_output), identity_rows)
 
     def _fps(t: float) -> float:
         return timed_frames / t if t > 0 else 0.0
@@ -147,10 +194,14 @@ def track_sequence(
     def _ms(t: float) -> float:
         return 1000.0 * t / timed_frames if timed_frames else 0.0
 
-    return {
+    stats = {
         "frames": float(len(frames)),
         "fps": _fps(pipe_time),
         "det_ms": _ms(det_time),
         "reid_ms": _ms(reid_time),
         "track_ms": _ms(track_time),
     }
+    if identity_manager is not None:
+        stats["identity_ms"] = _ms(identity_time)
+        stats["num_identities"] = float(identity_manager.db.num_identities)
+    return stats

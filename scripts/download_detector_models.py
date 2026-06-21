@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download NanoDet + MMDet weights for detector eval (Colab / local)."""
+"""Download detector model weights."""
 from __future__ import annotations
 
 import argparse

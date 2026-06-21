@@ -1,9 +1,4 @@
-"""Online identity gallery for the standalone body-ReID DB.
-
-Grows a gallery of identities and, for each incoming descriptor, decides whether
-it matches a known identity (cosine distance <= radius) or starts a new one.
-Descriptors are assumed L2-normalized (the ReID extractors guarantee this).
-"""
+"""Online identity gallery."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -25,21 +20,6 @@ class GalleryEntry:
 
 
 class IdentityDatabase:
-    """Growing gallery; assigns a known or new identity by cosine distance.
-
-    Parameters
-    ----------
-    radius : float
-        New-identity threshold: nearest distance above it -> create new identity.
-    k : int
-        Neighbours used for the identity vote in ``knn`` representation.
-    representation : str
-        ``"centroid"`` keeps one running-mean vector per identity (fast, capped
-        memory); ``"knn"`` keeps up to ``max_per_identity`` descriptors and votes.
-    max_per_identity : int
-        Cap on stored descriptors per identity in ``knn`` mode (memory guard).
-    """
-
     def __init__(
         self,
         *,
@@ -77,7 +57,6 @@ class IdentityDatabase:
         return entry
 
     def _candidates(self) -> tuple[np.ndarray, np.ndarray]:
-        """Stacked vectors and their identity ids for distance computation."""
         if self.representation == "centroid":
             mat = np.stack([e.centroid for e in self.entries])
             labels = np.array([e.identity_id for e in self.entries])
@@ -107,14 +86,9 @@ class IdentityDatabase:
                 entry.descriptors.pop(0)
 
     def create_identity(self, desc: np.ndarray) -> int:
-        """Force a brand-new identity (used by conflict resolution)."""
         return self._new_entry(np.asarray(desc, dtype=np.float32)).identity_id
 
     def assign(self, desc: np.ndarray) -> tuple[int, float, bool]:
-        """Match ``desc`` to a known identity or create a new one.
-
-        Returns ``(identity_id, nearest_distance, is_new)``.
-        """
         desc = np.asarray(desc, dtype=np.float32)
         query = _l2(desc)
         if not self.entries:
@@ -137,7 +111,6 @@ class IdentityDatabase:
         return identity_id, nearest, False
 
     def distance_to(self, identity_id: int, desc: np.ndarray) -> float:
-        """Cosine distance from ``desc`` to an identity centroid."""
         query = _l2(np.asarray(desc, dtype=np.float32))
         try:
             entry = self._entry_by_id(identity_id)

@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate the standalone identity DB on MOT GT crops (Additional task).
-
-Builds an online identity gallery from GT pedestrian crops and compares the
-assigned identities to GT ids (Fowlkes-Mallows, ARI, V-measure, id counts).
-Tune --radius / --k / --representation / --window / --conflict-policy.
-"""
+"""Evaluate identity DB on GT crops."""
 from __future__ import annotations
 
 import argparse

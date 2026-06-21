@@ -9,22 +9,17 @@ import numpy as np
 
 @dataclass(frozen=True)
 class DetectionResult:
-    """Person detection in tlwh format (DeepSORT-compatible)."""
-
     tlwh: np.ndarray
     confidence: float
 
 
 class Detector(ABC):
-    """Abstract person detector: frame (BGR) -> list of detections."""
-
     @abstractmethod
     def detect(self, frame: np.ndarray) -> list[DetectionResult]:
         raise NotImplementedError
 
 
 def xyxy_to_tlwh(boxes: np.ndarray) -> np.ndarray:
-    """Convert Nx4 boxes from (x1,y1,x2,y2) to (x,y,w,h)."""
     boxes = np.asarray(boxes, dtype=np.float64)
     if boxes.size == 0:
         return boxes.reshape(0, 4)
@@ -35,7 +30,6 @@ def xyxy_to_tlwh(boxes: np.ndarray) -> np.ndarray:
 
 
 def tlwh_to_xyxy(boxes: np.ndarray) -> np.ndarray:
-    """Convert Nx4 boxes from (x,y,w,h) to (x1,y1,x2,y2)."""
     boxes = np.asarray(boxes, dtype=np.float64)
     if boxes.size == 0:
         return boxes.reshape(0, 4)
@@ -46,7 +40,6 @@ def tlwh_to_xyxy(boxes: np.ndarray) -> np.ndarray:
 
 
 def create_detector(name: str, cfg: dict) -> Detector:
-    """Factory: yolo | nanodet | mmdet | yolo_seg."""
     key = name.lower()
     if key == "yolo":
         from detectors.yolo import YoloDetector
@@ -60,10 +53,11 @@ def create_detector(name: str, cfg: dict) -> Detector:
         from detectors.mmdet import MMDetDetector
 
         return MMDetDetector(**cfg)
-    if key == "yolo_seg":
-        from segmentation.yolo_seg import YoloSegDetector
+    if key in ("yolo_seg", "detectron2_seg", "smp_seg"):
+        from segmentation.base import create_segmenter
 
-        return YoloSegDetector(**cfg)
+        return create_segmenter(key, cfg)
     raise ValueError(
-        f"Unknown detector: {name}. Choose yolo, nanodet, mmdet, or yolo_seg."
+        f"Unknown detector: {name}. Choose yolo, nanodet, mmdet, "
+        "yolo_seg, detectron2_seg, or smp_seg."
     )

@@ -1,4 +1,4 @@
-"""YOLOv8 detector (ultralytics)."""
+"""YOLOv8 detector."""
 from __future__ import annotations
 
 import numpy as np

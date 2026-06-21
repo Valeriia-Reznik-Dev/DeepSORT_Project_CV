@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate ReID models on MOT GT pedestrian crops (clustering metrics)."""
+"""Evaluate ReID on GT crops."""
 from __future__ import annotations
 
 import argparse

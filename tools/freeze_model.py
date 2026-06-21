@@ -178,8 +178,6 @@ def _preprocess(image):
 
 
 def parse_args():
-    """Parse command line arguments.
-    """
     parser = argparse.ArgumentParser(description="Freeze old model")
     parser.add_argument(
         "--checkpoint_in",

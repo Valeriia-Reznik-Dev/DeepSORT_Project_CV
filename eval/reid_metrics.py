@@ -1,4 +1,4 @@
-"""Standalone ReID clustering metrics on MOT GT pedestrian crops."""
+"""ReID clustering metrics on GT crops."""
 from __future__ import annotations
 
 import csv
@@ -27,7 +27,6 @@ def load_mot_gt_with_ids(
     *,
     is_mot16: bool,
 ) -> dict[int, list[tuple[np.ndarray, int]]]:
-    """Load GT pedestrians per frame: frame -> [(tlwh, track_id), ...]."""
     gt_path = Path(gt_path)
     by_frame: dict[int, list[tuple[np.ndarray, int]]] = defaultdict(list)
 
@@ -121,7 +120,6 @@ def collect_gt_features(
     max_samples: int | None = None,
     seed: int = 0,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Extract descriptors for all GT pedestrian boxes in a sequence."""
     sequence_dir = Path(sequence_dir)
     gt_by_frame = load_mot_gt_with_ids(gt_path, is_mot16=is_mot16)
     frames = _sequence_frames(sequence_dir)

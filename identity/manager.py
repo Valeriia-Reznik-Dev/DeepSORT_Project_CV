@@ -1,12 +1,4 @@
-"""Identity assignment pipeline: DB lookup -> window vote -> conflict resolution.
-
-Wraps :class:`IdentityDatabase` with the per-track logic from the spec:
-1. each detection gets a DB identity (known or new);
-2. the identity is appended to the track's identity history;
-3. the track's final identity is the majority vote over the last ``window`` frames;
-4. if two active tracks resolve to the same identity, the farther one (by distance
-   to the identity centroid) is split off into a fresh identity.
-"""
+"""Identity DB: lookup, vote, conflict resolution."""
 from __future__ import annotations
 
 from collections import Counter, deque
@@ -46,21 +38,6 @@ class IdentityManager:
     def update(
         self, frame_idx: int, detections: list[tuple[int, np.ndarray]]
     ) -> tuple[dict[int, int], dict[int, int]]:
-        """Process one frame.
-
-        Parameters
-        ----------
-        frame_idx : int
-            Current frame index (used as the identity timestamp).
-        detections : list[(track_id, descriptor)]
-            One entry per active track in this frame.
-
-        Returns
-        -------
-        (resolved, raw)
-            ``raw[track_id]`` is the per-detection DB identity; ``resolved[track_id]``
-            is the window-voted, conflict-resolved identity.
-        """
         raw: dict[int, int] = {}
         dist: dict[int, float] = {}
         for track_id, desc in detections:

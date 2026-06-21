@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run TrackEval HOTA evaluation on tracking results."""
+"""Run TrackEval HOTA on tracking results."""
 from __future__ import annotations
 
 import argparse

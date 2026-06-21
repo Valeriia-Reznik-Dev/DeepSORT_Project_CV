@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run original DeepSORT baseline on all 6 evaluation sequences."""
+"""Run original DeepSORT baseline on 6 sequences."""
 from __future__ import annotations
 
 import argparse

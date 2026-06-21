@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download fast-reid Market1501 weights (torchreid uses built-in pretrained)."""
+"""Download fast-reid weights."""
 from __future__ import annotations
 
 import argparse

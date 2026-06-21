@@ -1,4 +1,4 @@
-"""Live tracking pipeline (detector + ReID + DeepSORT core)."""
+"""Live tracking pipeline."""
 
 from tracking.pipeline import TrackerParams, track_sequence
 

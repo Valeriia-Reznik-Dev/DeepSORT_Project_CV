@@ -1,4 +1,4 @@
-"""TrackEval wrapper: MOT HOTA evaluation from baseline_original.yaml."""
+"""TrackEval HOTA wrapper."""
 from __future__ import annotations
 
 import csv
@@ -67,13 +67,13 @@ def eval_plan_from_config(
                 "MOT15",
                 Path(paths["mot15_dir"]),
                 tuple(sequences["mot15"]),
-                True,  # official TrackEval default; no effect on our MOT15 GT (verified)
+                True,
             ),
             _BenchmarkSpec(
                 "MOT16",
                 Path(paths["mot16_dir"]),
                 tuple(sequences["mot16"]),
-                True,  # required: distractor classes + ignore zones
+                True,
             ),
         ),
     )

@@ -1,0 +1,36 @@
+# Per-video DeepSORT tracker parameters (Stage 8 tuning).
+#
+# `default` is applied to any sequence not listed in `per_video`.
+# `per_video` overrides only the listed fields for that sequence.
+# Fill `per_video` from scripts/run_param_sweep.py results (parameter evolution).
+#
+# Fields: min_confidence, min_detection_height, nms_max_overlap,
+#         max_cosine_distance, nn_budget.
+
+default:
+  min_confidence: 0.3
+  min_detection_height: 0
+  nms_max_overlap: 1.0
+  max_cosine_distance: 0.2
+  nn_budget: 100
+
+per_video:
+  # Static-camera sequences tolerate a tighter appearance gate.
+  TUD-Campus:
+    max_cosine_distance: 0.2
+  TUD-Stadtmitte:
+    max_cosine_distance: 0.2
+  KITTI-17:
+    max_cosine_distance: 0.2
+  PETS09-S2L1:
+    max_cosine_distance: 0.2
+    nms_max_overlap: 0.9
+  MOT16-09:
+    max_cosine_distance: 0.25
+    min_confidence: 0.4
+  # Moving camera: Kalman motion model degrades, lean more on appearance
+  # (looser cosine gate + larger budget) and stricter detections.
+  MOT16-11:
+    max_cosine_distance: 0.3
+    min_confidence: 0.4
+    nn_budget: 150

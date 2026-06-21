@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render baseline tracking overlays for available sequences."""
+"""Render tracking overlay videos."""
 from __future__ import annotations
 
 import argparse
