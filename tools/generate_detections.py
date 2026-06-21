@@ -22,6 +22,29 @@ def _run_in_batches(f, data_dict, out, batch_size):
 
 
 def extract_image_patch(image, bbox, patch_shape):
+    """Extract image patch from bounding box.
+
+    Parameters
+    ----------
+    image : ndarray
+        The full image.
+    bbox : array_like
+        The bounding box in format (x, y, width, height).
+    patch_shape : Optional[array_like]
+        This parameter can be used to enforce a desired patch shape
+        (height, width). First, the `bbox` is adapted to the aspect ratio
+        of the patch shape, then it is clipped at the image boundaries.
+        If None, the shape is computed from :arg:`bbox`.
+
+    Returns
+    -------
+    ndarray | NoneType
+        An image patch showing the :arg:`bbox`, optionally reshaped to
+        :arg:`patch_shape`.
+        Returns None if the bounding box is empty or fully outside of the image
+        boundaries.
+
+    """
     bbox = np.array(bbox)
     if patch_shape is not None:
         # correct aspect ratio to patch shape
@@ -94,6 +117,24 @@ def create_box_encoder(model_filename, input_name="images",
 
 
 def generate_detections(encoder, mot_dir, output_dir, detection_dir=None):
+    """Generate detections with features.
+
+    Parameters
+    ----------
+    encoder : Callable[image, ndarray] -> ndarray
+        The encoder function takes as input a BGR color image and a matrix of
+        bounding boxes in format `(x, y, w, h)` and returns a matrix of
+        corresponding feature vectors.
+    mot_dir : str
+        Path to the MOTChallenge directory (can be either train or test).
+    output_dir
+        Path to the output directory. Will be created if it does not exist.
+    detection_dir
+        Path to custom detections. The directory structure should be the default
+        MOTChallenge structure: `[sequence]/det/det.txt`. If None, uses the
+        standard MOTChallenge detections.
+
+    """
     if detection_dir is None:
         detection_dir = mot_dir
     try:
@@ -142,6 +183,8 @@ def generate_detections(encoder, mot_dir, output_dir, detection_dir=None):
 
 
 def parse_args():
+    """Parse command line arguments.
+    """
     parser = argparse.ArgumentParser(description="Re-ID feature extractor")
     parser.add_argument(
         "--model",
