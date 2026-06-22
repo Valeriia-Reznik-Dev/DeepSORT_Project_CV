@@ -1,7 +1,6 @@
 """torchreid adapter (OSNet, ResNet50)."""
 from __future__ import annotations
 
-import pickle
 from collections import OrderedDict
 from pathlib import Path
 
@@ -76,16 +75,13 @@ def _torch_load_default(path: Path):
 
 
 def _torch_load_latin1(path: Path):
-    try:
-        return torch.load(
-            str(path),
-            map_location="cpu",
-            weights_only=False,
-            pickle_load_args={"encoding": "latin1"},
-        )
-    except TypeError:
-        with path.open("rb") as handle:
-            return pickle.load(handle, encoding="latin1")
+    # torchreid Market1501 checkpoints (PyTorch 1.x) need latin1 on Python 3.12+.
+    return torch.load(
+        str(path),
+        map_location="cpu",
+        weights_only=False,
+        encoding="latin1",
+    )
 
 
 def _load_pretrained_weights(model: torch.nn.Module, checkpoint_path: str) -> None:
