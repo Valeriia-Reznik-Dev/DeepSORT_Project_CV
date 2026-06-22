@@ -14,27 +14,49 @@ from reid.base import (
 )
 
 
+def _strip_classification_head(model: torch.nn.Module) -> None:
+    if hasattr(model, "classifier") and isinstance(model.classifier, torch.nn.Linear):
+        model.classifier = torch.nn.Identity()
+    if hasattr(model, "fc") and isinstance(model.fc, torch.nn.Linear):
+        model.fc = torch.nn.Identity()
+
+
+def _build_torchreid_model(model_name: str, checkpoint: str | None):
+    import torchreid
+    from torchreid.utils import check_isfile, load_pretrained_weights
+
+    is_osnet = model_name.startswith("osnet")
+    num_classes = 1 if is_osnet else 751
+    pretrained = not (checkpoint and check_isfile(checkpoint))
+
+    model = torchreid.models.build_model(
+        name=model_name,
+        num_classes=num_classes,
+        loss="softmax",
+        pretrained=pretrained,
+    )
+    _strip_classification_head(model)
+
+    if checkpoint and check_isfile(checkpoint):
+        load_pretrained_weights(model, checkpoint)
+
+    return model
+
+
 class TorchReIDExtractor(ReIDExtractor):
     def __init__(
         self,
         model_name: str = "osnet_x1_0",
         device: str = "cpu",
         batch_size: int = 32,
+        checkpoint: str | None = None,
         **_: object,
     ):
-        import torchreid
-
         self.device = torch.device(device)
         self.batch_size = batch_size
         self.model_name = model_name
 
-        self.model = torchreid.models.build_model(
-            name=model_name,
-            num_classes=1,
-            loss="softmax",
-            pretrained=True,
-        )
-        self.model.classifier = torch.nn.Identity()
+        self.model = _build_torchreid_model(model_name, checkpoint)
         self.model.eval()
         self.model.to(self.device)
 

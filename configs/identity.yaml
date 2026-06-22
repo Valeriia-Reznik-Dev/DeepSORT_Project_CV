@@ -2,7 +2,7 @@
 # Enable in the tracker with: python scripts/run_tracker.py --identity ...
 
 identity:
-  radius: 0.3
+  radius: 0.4
   k: 1
   representation: centroid  # centroid | knn
   window: 30

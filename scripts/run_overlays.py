@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render tracking overlay videos."""
+"""Render tracking overlay videos (headless, no GUI)."""
 from __future__ import annotations
 
 import argparse
@@ -12,37 +12,20 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 import generate_videos  # noqa: E402
-import show_results  # noqa: E402
+from eval.overlay_render import render_overlays_for_mot_dir  # noqa: E402
 
 
-def run_for_mot_dir(mot_dir, result_dir, output_dir, convert_h264, update_ms):
-    if not os.path.isdir(mot_dir):
-        print(f"SKIP overlays (missing): {mot_dir}")
-        return
-
-    os.makedirs(output_dir, exist_ok=True)
-    print(f"Rendering overlays from {mot_dir}")
-    for sequence_txt in os.listdir(result_dir):
-        if not sequence_txt.endswith(".txt"):
-            continue
-        sequence = os.path.splitext(sequence_txt)[0]
-        sequence_dir = os.path.join(mot_dir, sequence)
-        if not os.path.isdir(sequence_dir):
-            continue
-        result_file = os.path.join(result_dir, sequence_txt)
-        video_filename = os.path.join(output_dir, f"{sequence}.avi")
-        print(f"Saving {sequence} -> {video_filename}")
-        show_results.run(
-            sequence_dir, result_file, False, None, update_ms, video_filename)
-
+def run_for_mot_dir(mot_dir, result_dir, output_dir, convert_h264, fourcc):
+    written = render_overlays_for_mot_dir(
+        mot_dir, result_dir, output_dir, fourcc=fourcc
+    )
     if not convert_h264:
-        return
-    for sequence_txt in os.listdir(result_dir):
-        sequence = os.path.splitext(sequence_txt)[0]
-        filename_in = os.path.join(output_dir, f"{sequence}.avi")
-        filename_out = os.path.join(output_dir, f"{sequence}.mp4")
-        if os.path.isfile(filename_in):
-            generate_videos.convert(filename_in, filename_out)
+        return written
+
+    for avi_path in written:
+        mp4_path = avi_path.with_suffix(".mp4")
+        generate_videos.convert(str(avi_path), str(mp4_path))
+    return written
 
 
 def main():
@@ -62,6 +45,11 @@ def main():
         help="Output folder for overlay videos (default: paths.overlays_dir).",
     )
     parser.add_argument("--convert_h264", action="store_true")
+    parser.add_argument(
+        "--fourcc",
+        default="MJPG",
+        help="OpenCV VideoWriter fourcc (default: MJPG).",
+    )
     args = parser.parse_args()
 
     os.chdir(ROOT)
@@ -76,14 +64,14 @@ def main():
         results_dir,
         overlays_dir,
         args.convert_h264,
-        None,
+        args.fourcc,
     )
     run_for_mot_dir(
         paths["mot16_dir"],
         results_dir,
         overlays_dir,
         args.convert_h264,
-        None,
+        args.fourcc,
     )
 
 

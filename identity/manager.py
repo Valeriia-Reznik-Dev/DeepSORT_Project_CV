@@ -11,7 +11,7 @@ from identity.database import IdentityDatabase
 
 @dataclass
 class IdentityParams:
-    radius: float = 0.3
+    radius: float = 0.4
     k: int = 1
     representation: str = "centroid"
     window: int = 30

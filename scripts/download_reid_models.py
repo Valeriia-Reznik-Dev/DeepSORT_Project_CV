@@ -8,9 +8,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-FASTREID_WEIGHT_URL = (
-    "https://github.com/JDAI-CV/fast-reid/releases/download/v0.1.1/market_bot_R50.pth"
-)
+FASTREID_WEIGHTS = {
+    "market_bot_R50.pth": (
+        "https://github.com/JDAI-CV/fast-reid/releases/download/v0.1.1/market_bot_R50.pth"
+    ),
+    "market_bot_R50-ibn.pth": (
+        "https://github.com/JDAI-CV/fast-reid/releases/download/v0.1.1/market_bot_R50-ibn.pth"
+    ),
+}
 
 
 def _download(url: str, dest: Path) -> None:
@@ -31,10 +36,15 @@ def main() -> None:
     )
     args = parser.parse_args()
     root = Path(args.root)
-
     out = root / "resources" / "models" / "fastreid"
-    _download(FASTREID_WEIGHT_URL, out / "market_bot_R50.pth")
-    print("Done. torchreid (osnet, resnet50_ibn) downloads pretrained weights on first run.")
+
+    for filename, url in FASTREID_WEIGHTS.items():
+        _download(url, out / filename)
+
+    print(
+        "Done. torchreid (osnet) downloads ReID weights on first run; "
+        "resnet50_ibn uses fast-reid market_bot_R50-ibn.pth."
+    )
 
 
 if __name__ == "__main__":

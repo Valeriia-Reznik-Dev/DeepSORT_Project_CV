@@ -64,22 +64,40 @@ def main() -> None:
     )
     parser.add_argument("--reid-config", default=os.path.join(ROOT, "configs", "reid.yaml"))
     parser.add_argument(
+        "--identity-config", default=os.path.join(ROOT, "configs", "identity.yaml")
+    )
+    parser.add_argument(
         "--reid", default="osnet", choices=["osnet", "resnet50_ibn", "fastreid"]
     )
     parser.add_argument("--device", default=None, help="cuda:0 / cpu (default: auto)")
     parser.add_argument("--output-dir", default=os.path.join(ROOT, "results", "identity"))
     parser.add_argument("--max-frames", type=int, default=None)
-    # Identity DB parameters (tunable for the report).
-    parser.add_argument("--radius", type=float, default=0.3)
-    parser.add_argument("--k", type=int, default=1)
+    identity_defaults = load_yaml(
+        os.path.join(ROOT, "configs", "identity.yaml")
+    ).get("identity", {})
+    # Identity DB parameters (defaults from configs/identity.yaml).
     parser.add_argument(
-        "--representation", default="centroid", choices=["centroid", "knn"]
+        "--radius",
+        type=float,
+        default=identity_defaults.get("radius", 0.4),
     )
-    parser.add_argument("--window", type=int, default=30)
+    parser.add_argument("--k", type=int, default=identity_defaults.get("k", 1))
     parser.add_argument(
-        "--conflict-policy", default="distance", choices=["distance", "none"]
+        "--representation",
+        default=identity_defaults.get("representation", "centroid"),
+        choices=["centroid", "knn"],
     )
-    parser.add_argument("--max-per-identity", type=int, default=50)
+    parser.add_argument("--window", type=int, default=identity_defaults.get("window", 30))
+    parser.add_argument(
+        "--conflict-policy",
+        default=identity_defaults.get("conflict_policy", "distance"),
+        choices=["distance", "none"],
+    )
+    parser.add_argument(
+        "--max-per-identity",
+        type=int,
+        default=identity_defaults.get("max_per_identity", 50),
+    )
     args = parser.parse_args()
 
     os.chdir(ROOT)

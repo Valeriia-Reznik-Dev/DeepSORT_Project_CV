@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from pathlib import Path
 
 import numpy as np
+
+ROOT = Path(__file__).resolve().parents[1]
 
 # Person ReID standard input size (height, width).
 REID_PATCH_SHAPE = (256, 128)
@@ -108,10 +111,13 @@ def create_reid_extractor(name: str, cfg: dict) -> ReIDExtractor:
         model_name = cfg.pop("model_name", "osnet_x1_0")
         return TorchReIDExtractor(model_name=model_name, **cfg)
     if key == "resnet50_ibn":
-        from reid.torchreid_ext import TorchReIDExtractor
+        from reid.fastreid_ext import FastReIDExtractor
 
-        model_name = cfg.pop("model_name", "resnet50_ibn_a")
-        return TorchReIDExtractor(model_name=model_name, **cfg)
+        default_config = ROOT / "third_party" / "fast_reid" / "configs" / "Market1501" / "bagtricks_R50-ibn.yml"
+        default_checkpoint = ROOT / "resources" / "models" / "fastreid" / "market_bot_R50-ibn.pth"
+        config = cfg.pop("config", str(default_config))
+        checkpoint = cfg.pop("checkpoint", str(default_checkpoint))
+        return FastReIDExtractor(config=config, checkpoint=checkpoint, **cfg)
     if key == "fastreid":
         from reid.fastreid_ext import FastReIDExtractor
 

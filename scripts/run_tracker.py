@@ -152,7 +152,7 @@ def main() -> None:
     if args.identity:
         identity_manager = IdentityManager(
             IdentityParams(
-                radius=float(identity_cfg.get("radius", 0.3)),
+                radius=float(identity_cfg.get("radius", 0.4)),
                 k=int(identity_cfg.get("k", 1)),
                 representation=str(identity_cfg.get("representation", "centroid")),
                 window=int(identity_cfg.get("window", 30)),

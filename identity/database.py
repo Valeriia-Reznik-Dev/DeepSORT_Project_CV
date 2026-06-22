@@ -23,7 +23,7 @@ class IdentityDatabase:
     def __init__(
         self,
         *,
-        radius: float = 0.3,
+        radius: float = 0.4,
         k: int = 1,
         representation: str = "centroid",
         max_per_identity: int = 50,

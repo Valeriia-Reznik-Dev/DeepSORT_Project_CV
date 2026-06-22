@@ -10,11 +10,13 @@ import torch
 from detectors.base import DetectionResult, Detector, xyxy_to_tlwh
 from segmentation.base import SegResult, Segmenter
 
+COCO_PERSON_CLASS = 1
 
-def _load_checkpoint(model, path: Path) -> None:
-    state = torch.load(path, map_location="cpu", weights_only=False)
-    if isinstance(state, dict) and "state_dict" in state:
-        state = state["state_dict"]
+
+def _load_smp_checkpoint(model, raw: dict) -> None:
+    state = raw.get("state_dict", raw) if isinstance(raw, dict) else raw
+    if not isinstance(state, dict):
+        raise ValueError("Unexpected SMP checkpoint format")
     mapped: dict[str, torch.Tensor] = {}
     model_keys = set(model.state_dict().keys())
     for key, value in state.items():
@@ -27,16 +29,15 @@ def _load_checkpoint(model, path: Path) -> None:
             if cand in model_keys:
                 mapped[cand] = value
                 break
-    missing, unexpected = model.load_state_dict(mapped, strict=False)
-    if missing:
-        print(f"SMP: loaded partial weights ({len(mapped)} tensors, {len(missing)} missing).")
+    model.load_state_dict(mapped, strict=False)
+    print(f"SMP: loaded {len(mapped)} tensors from mmseg-style checkpoint.")
 
 
 class SmpSegDetector(Detector, Segmenter):
     def __init__(
         self,
         arch: str = "DeepLabV3Plus",
-        encoder: str = "resnet34",
+        encoder: str = "resnet50",
         encoder_weights: str | None = "imagenet",
         classes: int = 19,
         person_class: int = 11,
@@ -45,6 +46,29 @@ class SmpSegDetector(Detector, Segmenter):
         min_area: int = 400,
         device: str = "cpu",
     ):
+        if device == "auto":
+            device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        self.device = torch.device(device)
+        self.conf_threshold = float(conf_threshold)
+        self.min_area = int(min_area)
+        self._mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+        self._std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+        self._backend = "smp"
+        self.person_class = int(person_class)
+
+        ckpt_path = Path(checkpoint) if checkpoint else None
+        tv_payload = _read_tv_payload(ckpt_path) if ckpt_path and ckpt_path.is_file() else None
+
+        if tv_payload is not None:
+            import torchvision.models.segmentation as seg
+
+            self._backend = "torchvision"
+            self.person_class = COCO_PERSON_CLASS
+            self.model = seg.deeplabv3_resnet50(weights=None)
+            self.model.load_state_dict(tv_payload)
+            self.model.to(self.device).eval()
+            return
+
         try:
             import segmentation_models_pytorch as smp
         except ImportError as exc:
@@ -62,31 +86,25 @@ class SmpSegDetector(Detector, Segmenter):
             in_channels=3,
             classes=classes,
         )
-        ckpt_path = Path(checkpoint) if checkpoint else None
         if ckpt_path is not None and ckpt_path.is_file():
-            _load_checkpoint(self.model, ckpt_path)
+            payload = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+            _load_smp_checkpoint(self.model, payload)
         elif ckpt_path is not None:
             print(
-                f"SMP checkpoint not found ({ckpt_path}); using encoder_weights={encoder_weights!r} only. "
+                f"SMP checkpoint not found ({ckpt_path}); using encoder_weights={encoder_weights!r}. "
                 "Run: python scripts/setup_segmentation_colab.py --download-smp-weights"
             )
-
-        if device == "auto":
-            device = "cuda:0" if torch.cuda.is_available() else "cpu"
-        self.device = torch.device(device)
         self.model.to(self.device).eval()
-        self.person_class = int(person_class)
-        self.conf_threshold = float(conf_threshold)
-        self.min_area = int(min_area)
-        self._mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-        self._std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
     def _predict_logits(self, frame: np.ndarray) -> np.ndarray:
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
         rgb = (rgb - self._mean) / self._std
         tensor = torch.from_numpy(rgb.transpose(2, 0, 1)).unsqueeze(0).to(self.device)
         with torch.inference_mode():
-            logits = self.model(tensor)[0].cpu().numpy()
+            if self._backend == "torchvision":
+                logits = self.model(tensor)["out"][0].cpu().numpy()
+            else:
+                logits = self.model(tensor)[0].cpu().numpy()
         return logits
 
     def _person_mask(self, logits: np.ndarray, height: int, width: int) -> np.ndarray:
@@ -134,3 +152,10 @@ class SmpSegDetector(Detector, Segmenter):
             DetectionResult(tlwh=s.tlwh, confidence=s.confidence)
             for s in self.segment(frame)
         ]
+
+
+def _read_tv_payload(path: Path) -> dict | None:
+    payload = torch.load(path, map_location="cpu", weights_only=False)
+    if isinstance(payload, dict) and payload.get("format") == "torchvision_deeplabv3_r50":
+        return payload["state_dict"]
+    return None

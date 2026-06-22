@@ -10,7 +10,8 @@ reid_models:
     device: auto
     batch_size: 32
   resnet50_ibn:
-    model_name: resnet50_ibn_a
+    config: third_party/fast_reid/configs/Market1501/bagtricks_R50-ibn.yml
+    checkpoint: resources/models/fastreid/market_bot_R50-ibn.pth
     device: auto
     batch_size: 16
   fastreid:
