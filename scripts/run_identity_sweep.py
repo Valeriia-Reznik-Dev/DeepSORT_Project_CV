@@ -18,7 +18,7 @@ sys.path.insert(0, ROOT)
 
 from eval.identity_metrics import evaluate_identity  # noqa: E402
 from identity.manager import IdentityParams  # noqa: E402
-from reid.base import create_reid_extractor  # noqa: E402
+from reid.base import REID_MODEL_NAMES, create_reid_extractor  # noqa: E402
 
 INT_PARAMS = {"k", "window", "max_per_identity"}
 FLOAT_PARAMS = {"radius"}
@@ -84,7 +84,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Sweep one identity-DB parameter")
     parser.add_argument("--param", required=True, choices=SWEEPABLE)
     parser.add_argument("--values", nargs="+", required=True)
-    parser.add_argument("--reid", default="osnet", choices=["osnet", "resnet50_ibn", "fastreid"])
+    parser.add_argument("--reid", default="osnet", choices=list(REID_MODEL_NAMES))
     parser.add_argument("--project-config", default=os.path.join(ROOT, "configs", "baseline_original.yaml"))
     parser.add_argument("--reid-config", default=os.path.join(ROOT, "configs", "reid.yaml"))
     parser.add_argument("--device", default=None)

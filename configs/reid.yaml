@@ -9,6 +9,11 @@ reid_models:
     model_name: osnet_x1_0
     device: auto
     batch_size: 32
+  resnet50:
+    model_name: resnet50
+    checkpoint: resources/models/torchreid/market1501_resnet50.pth
+    device: auto
+    batch_size: 16
   resnet50_ibn:
     config: third_party/fast_reid/configs/Market1501/bagtricks_R50-ibn.yml
     checkpoint: resources/models/fastreid/market_bot_R50-ibn.pth

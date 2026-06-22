@@ -16,7 +16,7 @@ sys.path.insert(0, ROOT)
 
 from detectors.base import create_detector  # noqa: E402
 from eval import eval_plan_from_config, run_eval_plan  # noqa: E402
-from reid.base import create_reid_extractor  # noqa: E402
+from reid.base import REID_MODEL_NAMES, create_reid_extractor  # noqa: E402
 from tracking.params import params_for  # noqa: E402
 from tracking.pipeline import track_sequence  # noqa: E402
 
@@ -70,7 +70,7 @@ def main() -> None:
     parser.add_argument("--param", required=True, choices=SWEEPABLE)
     parser.add_argument("--values", nargs="+", type=float, required=True)
     parser.add_argument("--detector", default="yolo", choices=["yolo", "nanodet", "mmdet", "yolo_seg"])
-    parser.add_argument("--reid", default="osnet", choices=["osnet", "resnet50_ibn", "fastreid"])
+    parser.add_argument("--reid", default="osnet", choices=list(REID_MODEL_NAMES))
     parser.add_argument("--project-config", default=os.path.join(ROOT, "configs", "baseline_original.yaml"))
     parser.add_argument("--detectors-config", default=os.path.join(ROOT, "configs", "detectors.yaml"))
     parser.add_argument("--reid-config", default=os.path.join(ROOT, "configs", "reid.yaml"))

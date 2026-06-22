@@ -18,7 +18,7 @@ from eval.identity_metrics import (  # noqa: E402
     save_identity_report,
 )
 from identity.manager import IdentityParams  # noqa: E402
-from reid.base import create_reid_extractor  # noqa: E402
+from reid.base import REID_MODEL_NAMES, create_reid_extractor  # noqa: E402
 
 
 def load_yaml(path: str) -> dict:
@@ -67,7 +67,7 @@ def main() -> None:
         "--identity-config", default=os.path.join(ROOT, "configs", "identity.yaml")
     )
     parser.add_argument(
-        "--reid", default="osnet", choices=["osnet", "resnet50_ibn", "fastreid"]
+        "--reid", default="osnet", choices=list(REID_MODEL_NAMES)
     )
     parser.add_argument("--device", default=None, help="cuda:0 / cpu (default: auto)")
     parser.add_argument("--output-dir", default=os.path.join(ROOT, "results", "identity"))

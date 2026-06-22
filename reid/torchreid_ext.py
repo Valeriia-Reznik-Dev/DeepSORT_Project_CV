@@ -1,4 +1,4 @@
-"""torchreid adapter (OSNet, ResNet50-IBN)."""
+"""torchreid adapter (OSNet, ResNet50)."""
 from __future__ import annotations
 
 import numpy as np

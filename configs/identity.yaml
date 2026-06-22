@@ -9,4 +9,4 @@ identity:
   conflict_policy: distance  # distance | none
   max_per_identity: 50
   # Optional separate ReID for the identity gallery (null = reuse tracker ReID features).
-  reid_model: null  # osnet | resnet50_ibn | fastreid
+  reid_model: null  # osnet | resnet50 | resnet50_ibn | fastreid

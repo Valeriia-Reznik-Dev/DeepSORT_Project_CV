@@ -16,12 +16,12 @@ import numpy as np  # noqa: E402
 from detectors.base import create_detector  # noqa: E402
 from eval.reid_metrics import load_mot_gt_with_ids  # noqa: E402
 from identity.manager import IdentityManager, IdentityParams  # noqa: E402
-from reid.base import create_reid_extractor  # noqa: E402
+from reid.base import REID_MODEL_NAMES, create_reid_extractor  # noqa: E402
 from tracking.params import load_params_config, params_for  # noqa: E402
 from tracking.pipeline import track_sequence  # noqa: E402
 
 DETECTOR_CHOICES = ["yolo", "nanodet", "mmdet", "yolo_seg", "detectron2_seg", "smp_seg"]
-REID_CHOICES = ["osnet", "resnet50_ibn", "fastreid"]
+REID_CHOICES = list(REID_MODEL_NAMES)
 
 
 def load_yaml(path: str) -> dict:

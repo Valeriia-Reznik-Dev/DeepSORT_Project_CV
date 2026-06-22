@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download fast-reid weights."""
+"""Download ReID model weights (fast-reid + torchreid)."""
 from __future__ import annotations
 
 import argparse
@@ -17,14 +17,34 @@ FASTREID_WEIGHTS = {
     ),
 }
 
+# torchreid model zoo — ResNet50 trained on Market1501.
+TORCHREID_WEIGHTS = {
+    "market1501_resnet50.pth": "1dUUZ4rHDWohmsQXCRe2C_HbYkzz94iBV",
+}
 
-def _download(url: str, dest: Path) -> None:
+
+def _download_url(url: str, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.is_file():
         print(f"OK (exists): {dest}")
         return
     print(f"Downloading {url} -> {dest}")
     urllib.request.urlretrieve(url, dest)
+
+
+def _download_gdrive(file_id: str, dest: Path) -> None:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.is_file():
+        print(f"OK (exists): {dest}")
+        return
+    url = f"https://drive.google.com/uc?id={file_id}"
+    print(f"Downloading Google Drive {file_id} -> {dest}")
+    try:
+        import gdown
+
+        gdown.download(url, str(dest), quiet=False)
+    except ImportError:
+        _download_url(url, dest)
 
 
 def main() -> None:
@@ -36,14 +56,19 @@ def main() -> None:
     )
     args = parser.parse_args()
     root = Path(args.root)
-    out = root / "resources" / "models" / "fastreid"
 
+    fastreid_out = root / "resources" / "models" / "fastreid"
     for filename, url in FASTREID_WEIGHTS.items():
-        _download(url, out / filename)
+        _download_url(url, fastreid_out / filename)
+
+    torchreid_out = root / "resources" / "models" / "torchreid"
+    for filename, file_id in TORCHREID_WEIGHTS.items():
+        _download_gdrive(file_id, torchreid_out / filename)
 
     print(
-        "Done. torchreid (osnet) downloads ReID weights on first run; "
-        "resnet50_ibn uses fast-reid market_bot_R50-ibn.pth."
+        "Done. osnet (torchreid) downloads weights on first run; "
+        "resnet50 uses resources/models/torchreid/market1501_resnet50.pth; "
+        "resnet50_ibn/fastreid use fast-reid checkpoints."
     )
 
 

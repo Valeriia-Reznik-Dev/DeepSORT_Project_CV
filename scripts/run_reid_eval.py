@@ -17,7 +17,7 @@ from eval.reid_metrics import (  # noqa: E402
     print_reid_summary,
     save_reid_report,
 )
-from reid.base import create_reid_extractor  # noqa: E402
+from reid.base import REID_MODEL_NAMES, create_reid_extractor  # noqa: E402
 
 
 def load_yaml(path: str) -> dict:
@@ -70,9 +70,9 @@ def main() -> None:
     parser.add_argument(
         "--model",
         nargs="+",
-        default=["osnet", "resnet50_ibn", "fastreid"],
-        choices=["osnet", "resnet50_ibn", "fastreid"],
-        help="ReID models to evaluate (default: all three).",
+        default=["osnet", "resnet50", "resnet50_ibn", "fastreid"],
+        choices=list(REID_MODEL_NAMES),
+        help="ReID models to evaluate (default: all four).",
     )
     parser.add_argument(
         "--device",

@@ -11,6 +11,14 @@ ROOT = Path(__file__).resolve().parents[1]
 # Person ReID standard input size (height, width).
 REID_PATCH_SHAPE = (256, 128)
 
+REID_MODEL_NAMES = ("osnet", "resnet50", "resnet50_ibn", "fastreid")
+REID_SOURCES = {
+    "osnet": "torchreid",
+    "resnet50": "torchreid",
+    "resnet50_ibn": "fast-reid",
+    "fastreid": "fast-reid",
+}
+
 
 class ReIDExtractor(ABC):
     @property
@@ -105,10 +113,14 @@ def l2_normalize(features: np.ndarray) -> np.ndarray:
 def create_reid_extractor(name: str, cfg: dict) -> ReIDExtractor:
     key = name.lower()
     cfg = dict(cfg)
-    if key == "osnet":
+    if key in ("osnet", "resnet50"):
         from reid.torchreid_ext import TorchReIDExtractor
 
-        model_name = cfg.pop("model_name", "osnet_x1_0")
+        defaults = {
+            "osnet": "osnet_x1_0",
+            "resnet50": "resnet50",
+        }
+        model_name = cfg.pop("model_name", defaults[key])
         return TorchReIDExtractor(model_name=model_name, **cfg)
     if key == "resnet50_ibn":
         from reid.fastreid_ext import FastReIDExtractor
@@ -122,4 +134,6 @@ def create_reid_extractor(name: str, cfg: dict) -> ReIDExtractor:
         from reid.fastreid_ext import FastReIDExtractor
 
         return FastReIDExtractor(**cfg)
-    raise ValueError(f"Unknown ReID model: {name}. Choose osnet, resnet50_ibn, or fastreid.")
+    raise ValueError(
+        f"Unknown ReID model: {name}. Choose one of: {', '.join(REID_MODEL_NAMES)}."
+    )
