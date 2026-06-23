@@ -1,136 +1,235 @@
-# Deep SORT
+# Modern DeepSORT — Detection & ReID Extension
 
-## Introduction
+Course project for *Deep Learning for Computer Vision*. The original
+[DeepSORT](https://github.com/nwojke/deep_sort) (Wojke et al.) is extended with
+modern, switchable **detection** and **ReID** models, an optional **segmentation**
+stage, and a standalone **body-ReID identity database** (additional task). The
+system is evaluated on six MOT Challenge sequences using the standard MOTChallenge
+HOTA protocol (TrackEval, `trackeval==1.3.0`).
 
-This repository contains code for *Simple Online and Realtime Tracking with a Deep Association Metric* (Deep SORT).
-We extend the original [SORT](https://github.com/abewley/sort) algorithm to
-integrate appearance information based on a deep appearance descriptor.
-See the [arXiv preprint](https://arxiv.org/abs/1703.07402) for more information.
+The original DeepSORT core (`deep_sort/`, `application_util/`) is kept **unchanged**
+— all new code lives in dedicated packages around it. This preserves the upstream
+commit history and avoids copying from modern DeepSORT forks.
 
-## Installation
+## Headline results
 
-First, clone the repository and install dependencies:
+**Target metric:** mean **HOTA** over six test videos (arithmetic mean of
+per-sequence HOTA from TrackEval, `DO_PREPROC=True`, class = pedestrian). End-to-end
+**FPS** is mean throughput on Colab T4 (detector + ReID + tracker; excludes model
+load and disk I/O). Reported FPS values are from the Colab notebook run logs
+(`notebooks/baseline_colab.ipynb`).
+
+**Final configuration:** YOLOv8n + OSNet, `min_confidence=0.4`,
+`max_cosine_distance=0.2` → mean HOTA **52.60** at **17.54 FPS** (**+12.43** vs.
+baseline **40.17**), beats the baseline on every test video, real-time (≥5 FPS).
+
+Also implemented and evaluated: standalone identity database (resolved FM **0.657**
+at radius **0.4**); optional segmentation pipeline `yolo_seg` + `osnet_seg` (mean
+HOTA **51.08** at **10.60 FPS**).
+
+| Configuration | Mean HOTA | Beats baseline on all 6 | Mean FPS (T4) |
+|---|---:|---|---:|
+| Original DeepSORT (baseline) | 40.17 | — | — |
+| **YOLOv8n + OSNet** (defaults) | **51.23** | yes | 16.03 |
+| **YOLOv8n + OSNet** (`min_confidence=0.4`, `max_cosine_distance=0.2`) | **52.60** | yes | 17.54 |
+
+Upper bound with **ground-truth detections** + OSNet (ReID/association only): mean
+HOTA **80.18** — the gap to the live pipeline is dominated by detector recall, not
+by the association stage.
+
+Per-sequence HOTA (same evaluation protocol):
+
+| Sequence | Baseline | YOLOv8n + OSNet | YOLOv8n + OSNet (tuned) |
+|---|---:|---:|---:|
+| TUD-Campus | 39.86 | 47.96 | 52.96 |
+| TUD-Stadtmitte | 36.75 | 55.11 | 54.76 |
+| KITTI-17 | 43.41 | 55.71 | 57.68 |
+| PETS09-S2L1 | 44.84 | 52.43 | 51.68 |
+| MOT16-09 | 36.24 | 44.23 | 45.48 |
+| MOT16-11 | 39.95 | 51.95 | 53.01 |
+| **Mean (6 videos)** | **40.17** | **51.23** | **52.60** |
+
+HOTA tables match `results/tracking/sweep_summary.csv` and
+`results/param_sweep/sweep_min_confidence.csv`. Full ablations (detector × ReID
+sweep, segmentation, identity DB, parameter evolution) are in the
+[project report](#report-and-results).
+
+## What is new (vs. upstream DeepSORT)
+
+**Detectors** (3 sources): `YOLOv8n` (ultralytics), `NanoDet-Plus`
+(RangiLyu/nanodet), `RTMDet` (OpenMMLab / MMDetection).
+
+**ReID** (2 sources, 2 architecture families): `OSNet`, `ResNet50` (torchreid);
+`ResNet50-IBN`, `BoT R50` (`fastreid`, fast-reid).
+
+**Segmentation** (optional, 3 sources): `YOLOv8n-seg` (ultralytics),
+`Mask R-CNN R50-FPN` (detectron2), `DeepLabV3+` (segmentation-models-pytorch).
+Masks remove the background from each crop before ReID.
+
+**Standalone identity database** (additional task): an online gallery with
+centroid / kNN representation, radius-based lookup, majority-vote resolution over
+a time window, and distance-based conflict resolution between tracks.
+
+**Evaluation harness**: detector P/R/F1 vs. GT, standalone ReID clustering
+(Fowlkes–Mallows / Silhouette / Calinski–Harabasz), ReID-inside-tracker HOTA with
+GT detections, and full-system HOTA / MOTA / IDF1 via TrackEval.
+
+All detector / ReID / segmentation / identity components are **selectable before
+each run** from config files or CLI flags.
+
+## Repository structure
+
 ```
-git clone https://github.com/nwojke/deep_sort.git
-cd deep_sort
-
-# The following command installs all the dependencies required to run the
-# tracker and regenerate detections. If you only need to run the tracker with
-# existing detections, you can use pip install -r requirements.txt instead.
-pip install -r requirements-gpu.txt
+deep_sort/            Original DeepSORT core — UNCHANGED (Kalman, matching, Tracker)
+application_util/     Original DeepSORT utilities — UNCHANGED
+detectors/            Detector adapters: yolo, nanodet, mmdet (+ base)
+reid/                 ReID adapters: torchreid_ext, fastreid_ext (+ base)
+segmentation/         Segmenters: yolo_seg, detectron2_seg, smp_seg (+ base)
+tracking/             pipeline.py (live det+ReID -> DeepSORT core), params
+identity/             database.py, manager.py (additional task)
+eval/                 trackeval_wrap, detector_metrics, reid_metrics,
+                      identity_metrics, overlay_render
+configs/              baseline_original.yaml, detectors.yaml, reid.yaml,
+                      identity.yaml, tracker_params.yaml
+scripts/              run_* (experiments), setup_*_colab, download_* (weights)
+notebooks/            baseline_colab.ipynb  <-- main entry point
 ```
-Then, download pre-generated detections and the CNN checkpoint file from
-[here](https://drive.google.com/open?id=18fKzfqnqhqW3s9zwsCbnVJ5XF2JFeqMp).
 
-*NOTE:* The candidate object locations of our pre-generated detections are
-taken from the following paper:
+## Quick start (Google Colab — recommended)
+
+The full pipeline runs end-to-end from the notebook:
+
+1. Open `notebooks/baseline_colab.ipynb` in Colab and select a **GPU runtime (T4)**.
+2. Run the setup cells. They clone the repo, install dependencies, set up
+   torchreid / fast-reid, and mount datasets and model weights from Google Drive
+   into `resources/`.
+3. Run the experiment cells: baseline evaluation, detector metrics, ReID
+   evaluation, the integrated tracker sweep, segmentation, identity-database
+   evaluation, parameter tuning, and overlay rendering.
+
+Numerical outputs are written to `results/`; qualitative overlay videos to
+`overlays/original/` (baseline) and `overlays/best/` (best configuration).
+
+## Local install
+
+```bash
+git clone https://github.com/Valeriia-Reznik-Dev/DeepSORT_Project_CV.git
+cd DeepSORT_Project_CV
+
+# Modern pipeline (detectors + ReID + tracking + eval)
+pip install -r requirements-colab.txt       # numpy, opencv, scipy, pyyaml, trackeval==1.3.0
+pip install -r requirements-detectors.txt   # ultralytics, scikit-learn, torch, torchvision
+
+# torchreid / fast-reid (and NanoDet / MMDet if needed) are installed by the setup scripts:
+python scripts/setup_reid_colab.py
+python scripts/setup_detectors_colab.py
+python scripts/setup_segmentation_colab.py   # optional, for segmentation backends
 ```
-F. Yu, W. Li, Q. Li, Y. Liu, X. Shi, J. Yan. POI: Multiple Object Tracking with
-High Performance Detection and Appearance Feature. In BMTT, SenseTime Group
-Limited, 2016.
+
+Reproducing the **original** baseline additionally needs the upstream MARS
+appearance encoder (`mars-small128.pb`, TensorFlow); see `requirements-gpu.txt`
+and `requirements-baseline.txt`.
+
+### Data & weights (`resources/`, git-ignored)
+
+Large binaries are not committed and are mounted from Google Drive into
+`resources/`:
+
 ```
-We have replaced the appearance descriptor with a custom deep convolutional
-neural network (see below).
-
-## Running the tracker
-
-The following example starts the tracker on one of the
-[MOT16 benchmark](https://motchallenge.net/data/MOT16/)
-sequences.
-We assume resources have been extracted to the repository root directory and
-the MOT16 benchmark data is in `./MOT16`:
+resources/
+  detections/MOT15/train, MOT16/train     MOT video frames + ground truth
+  detections/MOT15_train, MOT16_train     Public detections converted to .npy
+  networks/mars-small128.pb               Original DeepSORT appearance encoder
+  models/torchreid, fastreid, nanodet,    Modern detector / ReID / seg weights
+         mmdet, smp
 ```
-python deep_sort_app.py \
-    --sequence_dir=./MOT16/test/MOT16-06 \
-    --detection_file=./resources/detections/MOT16_POI_test/MOT16-06.npy \
-    --min_confidence=0.3 \
-    --nn_budget=100 \
-    --display=True
+
+Modern detector and ReID weights can be fetched with
+`scripts/download_detector_models.py` and `scripts/download_reid_models.py`.
+
+**Test sequences:** TUD-Campus, TUD-Stadtmitte, KITTI-17, PETS09-S2L1 (MOT15);
+MOT16-09, MOT16-11 (MOT16).
+
+## Reproducing individual stages (CLI)
+
+Each notebook stage maps to a script. Defaults reproduce the reported setup.
+
+```bash
+# 1) Original DeepSORT baseline (public MOT detections -> results/baseline/original)
+python scripts/run_baseline.py
+
+# 2) Detector quality vs. GT (Precision / Recall / F1)
+python scripts/run_detector_eval.py --detector yolo nanodet mmdet
+
+# 3) Standalone ReID clustering on GT crops (FM / Silhouette / Calinski-Harabasz)
+python scripts/run_reid_eval.py --model osnet resnet50 resnet50_ibn fastreid
+
+# 4) Integrated tracker — single run (best global configuration)
+python scripts/run_tracker.py --detector yolo --reid osnet \
+    --min-confidence 0.4 --max-cosine-distance 0.2
+
+#    ReID inside the tracker with GT detections (perfect-detector upper bound)
+python scripts/run_tracker.py --detector yolo --reid osnet --gt-detections
+
+#    Segmentation variant (mask background before ReID)
+python scripts/run_tracker.py --detector yolo_seg --reid osnet --mask-background
+
+#    Additional task — enable the standalone identity database
+python scripts/run_tracker.py --detector yolo --reid osnet --identity
+
+# 5) Model sweep (detector x ReID combinations)
+python scripts/run_sweep.py
+
+# 6) Parameter tuning
+python scripts/run_param_sweep.py --param min_confidence     --values 0.2 0.3 0.4 0.5
+python scripts/run_param_sweep.py --param max_cosine_distance --values 0.1 0.2 0.3 0.4
+
+# 7) Identity-database ablations
+python scripts/run_identity_eval.py
+python scripts/run_identity_sweep.py --param radius --values 0.2 0.25 0.3 0.35 0.4
+
+# 8) Score any result folder with TrackEval (HOTA / MOTA / IDF1)
+python scripts/run_eval.py --tracker-name yolo_osnet \
+    --results-dir results/tracking/yolo_osnet
+
+# 9) Render overlay videos for a result folder
+python scripts/run_overlays.py \
+    --results-dir results/tracking/yolo_osnet --overlays-dir overlays/best
 ```
-Check `python deep_sort_app.py -h` for an overview of available options.
-There are also scripts in the repository to visualize results, generate videos,
-and evaluate the MOT challenge benchmark.
 
-## Generating detections
+Useful flags: `--device cuda:0|cpu`, `--max-frames N` (quick smoke test),
+`--params-config configs/tracker_params.yaml` (per-video tracker parameters).
+Identity-DB defaults (radius, window, conflict policy) live in
+`configs/identity.yaml`.
 
-Beside the main tracking application, this repository contains a script to
-generate features for person re-identification, suitable to compare the visual
-appearance of pedestrian bounding boxes using cosine similarity.
-The following example generates these features from standard MOT challenge
-detections. Again, we assume resources have been extracted to the repository
-root directory and MOT16 data is in `./MOT16`:
+## Report and results
+
+* **Report:** `ReznikV_Modern_DeepSORT_Project_Report.docx` — candidate models,
+  selection rationale, all numerical experiments, and the optimal
+  models/parameters with justification (submitted separately from the repo).
+* **Experiment outputs:** produced in Colab under `results/` and `overlays/`, and
+  archived in `project_outputs.zip` (the repository version-controls code,
+  configs, and scripts only).
+
+## Attribution & license
+
+This project builds on **Deep SORT** by Nicolai Wojke, Alex Bewley, and Dietrich
+Paulus — [nwojke/deep_sort](https://github.com/nwojke/deep_sort). The upstream
+core and its commit history are preserved unchanged. Released under
+**GPL-3.0** (see `LICENSE`).
+
+```bibtex
+@inproceedings{Wojke2017simple,
+  title={Simple Online and Realtime Tracking with a Deep Association Metric},
+  author={Wojke, Nicolai and Bewley, Alex and Paulus, Dietrich},
+  booktitle={2017 IEEE International Conference on Image Processing (ICIP)},
+  year={2017}, pages={3645--3649}, organization={IEEE}
+}
+
+@inproceedings{Wojke2018deep,
+  title={Deep Cosine Metric Learning for Person Re-identification},
+  author={Wojke, Nicolai and Bewley, Alex},
+  booktitle={2018 IEEE Winter Conference on Applications of Computer Vision (WACV)},
+  year={2018}, pages={748--756}, organization={IEEE}
+}
 ```
-python tools/generate_detections.py \
-    --model=resources/networks/mars-small128.pb \
-    --mot_dir=./MOT16/train \
-    --output_dir=./resources/detections/MOT16_train
-```
-The model has been generated with TensorFlow 1.5. If you run into
-incompatibility, re-export the frozen inference graph to obtain a new
-`mars-small128.pb` that is compatible with your version:
-```
-python tools/freeze_model.py
-```
-The ``generate_detections.py`` stores for each sequence of the MOT16 dataset
-a separate binary file in NumPy native format. Each file contains an array of
-shape `Nx138`, where N is the number of detections in the corresponding MOT
-sequence. The first 10 columns of this array contain the raw MOT detection
-copied over from the input file. The remaining 128 columns store the appearance
-descriptor. The files generated by this command can be used as input for the
-`deep_sort_app.py`.
-
-**NOTE**: If ``python tools/generate_detections.py`` raises a TensorFlow error,
-try passing an absolute path to the ``--model`` argument. This might help in
-some cases.
-
-## Training the model
-
-To train the deep association metric model we used a novel [cosine metric learning](https://github.com/nwojke/cosine_metric_learning) approach which is provided as a separate repository.
-
-## Highlevel overview of source files
-
-In the top-level directory are executable scripts to execute, evaluate, and
-visualize the tracker. The main entry point is in `deep_sort_app.py`.
-This file runs the tracker on a MOTChallenge sequence.
-
-In package `deep_sort` is the main tracking code:
-
-* `detection.py`: Detection base class.
-* `kalman_filter.py`: A Kalman filter implementation and concrete
-   parametrization for image space filtering.
-* `linear_assignment.py`: This module contains code for min cost matching and
-   the matching cascade.
-* `iou_matching.py`: This module contains the IOU matching metric.
-* `nn_matching.py`: A module for a nearest neighbor matching metric.
-* `track.py`: The track class contains single-target track data such as Kalman
-  state, number of hits, misses, hit streak, associated feature vectors, etc.
-* `tracker.py`: This is the multi-target tracker class.
-
-The `deep_sort_app.py` expects detections in a custom format, stored in .npy
-files. These can be computed from MOTChallenge detections using
-`generate_detections.py`. We also provide
-[pre-generated detections](https://drive.google.com/open?id=1VVqtL0klSUvLnmBKS89il1EKC3IxUBVK).
-
-## Citing DeepSORT
-
-If you find this repo useful in your research, please consider citing the following papers:
-
-    @inproceedings{Wojke2017simple,
-      title={Simple Online and Realtime Tracking with a Deep Association Metric},
-      author={Wojke, Nicolai and Bewley, Alex and Paulus, Dietrich},
-      booktitle={2017 IEEE International Conference on Image Processing (ICIP)},
-      year={2017},
-      pages={3645--3649},
-      organization={IEEE},
-      doi={10.1109/ICIP.2017.8296962}
-    }
-
-    @inproceedings{Wojke2018deep,
-      title={Deep Cosine Metric Learning for Person Re-identification},
-      author={Wojke, Nicolai and Bewley, Alex},
-      booktitle={2018 IEEE Winter Conference on Applications of Computer Vision (WACV)},
-      year={2018},
-      pages={748--756},
-      organization={IEEE},
-      doi={10.1109/WACV.2018.00087}
-    }
